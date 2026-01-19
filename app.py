@@ -2,6 +2,8 @@ import streamlit as st
 from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
+from datetime import datetime
+import uuid
 
 st.set_page_config(page_title="Ordini Aziendali", page_icon="📦")
 st.title("📦 Sistema Ordini Aziendali")
@@ -68,33 +70,33 @@ st.subheader("Aggiungi articoli all'ordine")
 
 # pulsante per aggiungere una nuova riga articolo
 if st.button("➕ Aggiungi articolo"):
-    st.session_state["ordine_articoli"].append({"articolo": None, "qty": 1})
+    # aggiungo un id univoco per ogni articolo
+    st.session_state["ordine_articoli"].append({"id": str(uuid.uuid4()), "articolo": None, "qty": 1})
 
-# lista temporanea per aggiornare gli articoli
+# crea le righe dinamiche con rimozione sicura
 nuovo_ordine_articoli = []
-
-for i, item in enumerate(st.session_state["ordine_articoli"]):
+for item in st.session_state["ordine_articoli"]:
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
         articolo_scelto = st.selectbox(
-            f"Articolo {i+1}",
+            "Articolo",
             [a["Descrizione"] for a in articoli],
             index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
-            key=f"art{i}"
+            key=f"art-{item['id']}"
         )
         item["articolo"] = articolo_scelto
     with col2:
         qty = st.number_input(
-            f"Quantità {i+1}",
+            "Quantità",
             min_value=0, step=1, format="%d",
             value=item["qty"],
-            key=f"qty{i}"
+            key=f"qty-{item['id']}"
         )
         item["qty"] = int(qty)
     with col3:
-        elimina = st.button("❌", key=f"del{i}")
+        elimina = st.button("❌", key=f"del-{item['id']}")
         if not elimina:
-            # mantieni solo articoli non eliminati
+            # mantieni solo gli articoli non eliminati
             nuovo_ordine_articoli.append(item)
 
 # aggiorna la session_state
