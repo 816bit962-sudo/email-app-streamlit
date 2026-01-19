@@ -9,7 +9,7 @@ st.title("📧 Email App")
 email = google_login()
 credentials = get_credentials()
 
-# 👤 HEADER UTENTE
+# 👤 header utente
 col1, col2 = st.columns([1, 4])
 
 with col1:
@@ -18,11 +18,12 @@ with col1:
 
 with col2:
     st.success(f"Loggato come {email}")
-    if st.button("Logout"):
+    if st.button("🚪 Logout"):
         logout()
 
 st.divider()
 
+# ✉️ form email
 to = st.text_input("Destinatario")
 subject = st.text_input("Oggetto")
 body = st.text_area("Messaggio")

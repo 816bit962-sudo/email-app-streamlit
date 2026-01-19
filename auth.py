@@ -9,11 +9,13 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
 ]
 
 def google_login():
-    # ✅ GIÀ LOGGATO → NON MOSTRA GOOGLE
-    if "credentials" in st.session_state:
+    # ✅ già loggato
+    if "credentials" in st.session_state and "email" in st.session_state:
         return st.session_state["email"]
 
     query_params = st.query_params
@@ -32,7 +34,7 @@ def google_login():
         redirect_uri=st.secrets["google"]["redirect_uri"],
     )
 
-    # 🔘 BOTTONE GOOGLE
+    # 🔐 bottone login
     if "code" not in query_params:
         auth_url, _ = flow.authorization_url(
             access_type="offline",
@@ -41,17 +43,17 @@ def google_login():
         st.link_button("🔐 Accedi con Google", auth_url)
         st.stop()
 
-    # 🔁 CODE → TOKEN
+    # 🔁 code → token
     flow.fetch_token(code=query_params["code"])
     creds = flow.credentials
 
-    # 👤 USER INFO
+    # 👤 user info
     userinfo = requests.get(
         "https://www.googleapis.com/oauth2/v2/userinfo",
         headers={"Authorization": f"Bearer {creds.token}"},
     ).json()
 
-    # ✅ SALVA SOLO DATI SERIALIZZABILI
+    # ✅ salva SOLO dati serializzabili
     st.session_state["credentials"] = {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -60,13 +62,11 @@ def google_login():
         "client_secret": creds.client_secret,
         "scopes": creds.scopes,
     }
-
     st.session_state["email"] = userinfo["email"]
     st.session_state["picture"] = userinfo.get("picture")
 
     st.query_params.clear()
     st.rerun()
-
 
 def get_credentials():
     if "credentials" not in st.session_state:
@@ -83,13 +83,12 @@ def get_credentials():
         scopes=data["scopes"],
     )
 
-    # 🔄 REFRESH AUTOMATICO
+    # 🔄 refresh automatico
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
         st.session_state["credentials"]["token"] = creds.token
 
     return creds
-
 
 def logout():
     st.session_state.clear()
