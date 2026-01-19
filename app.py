@@ -72,8 +72,11 @@ st.subheader("Aggiungi articoli all'ordine")
 if st.button("➕ Aggiungi articolo"):
     st.session_state["ordine_articoli"].append({"articolo": None, "qty": 1})
 
+# inizializza lista per rimozioni
+if "to_remove" not in st.session_state:
+    st.session_state["to_remove"] = -1
+
 # crea le righe dinamiche con rimozione sicura
-nuovo_ordine_articoli = []
 for i, item in enumerate(st.session_state["ordine_articoli"]):
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
@@ -93,12 +96,16 @@ for i, item in enumerate(st.session_state["ordine_articoli"]):
         )
         item["qty"] = int(qty)
     with col3:
-        if not st.button("❌", key=f"del{i}"):
-            # mantieni l'articolo solo se NON viene eliminato
-            nuovo_ordine_articoli.append(item)
+        if st.button("❌", key=f"del{i}"):
+            st.session_state["to_remove"] = i
 
-# aggiorna la session_state senza ricaricare la pagina
-st.session_state["ordine_articoli"] = nuovo_ordine_articoli
+# rimuovi l'articolo selezionato (solo dopo il rerun)
+if st.session_state["to_remove"] != -1:
+    idx = st.session_state["to_remove"]
+    if 0 <= idx < len(st.session_state["ordine_articoli"]):
+        st.session_state["ordine_articoli"].pop(idx)
+    st.session_state["to_remove"] = -1
+    st.experimental_rerun()  # forzare il rerun per aggiornare la UI
 
 # ===============================
 # 3️⃣ Riepilogo ordine in tempo reale
