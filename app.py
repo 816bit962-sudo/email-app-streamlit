@@ -2,8 +2,6 @@ import streamlit as st
 from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
-from datetime import datetime
-import traceback
 
 st.set_page_config(page_title="Ordini Aziendali", page_icon="📦")
 st.title("📦 Sistema Ordini Aziendali")
@@ -72,11 +70,9 @@ st.subheader("Aggiungi articoli all'ordine")
 if st.button("➕ Aggiungi articolo"):
     st.session_state["ordine_articoli"].append({"articolo": None, "qty": 1})
 
-# inizializza lista per rimozioni
-if "to_remove" not in st.session_state:
-    st.session_state["to_remove"] = -1
+# lista temporanea per aggiornare gli articoli
+nuovo_ordine_articoli = []
 
-# crea le righe dinamiche con rimozione sicura
 for i, item in enumerate(st.session_state["ordine_articoli"]):
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
@@ -96,16 +92,13 @@ for i, item in enumerate(st.session_state["ordine_articoli"]):
         )
         item["qty"] = int(qty)
     with col3:
-        if st.button("❌", key=f"del{i}"):
-            st.session_state["to_remove"] = i
+        elimina = st.button("❌", key=f"del{i}")
+        if not elimina:
+            # mantieni solo articoli non eliminati
+            nuovo_ordine_articoli.append(item)
 
-# rimuovi l'articolo selezionato (solo dopo il rerun)
-if st.session_state["to_remove"] != -1:
-    idx = st.session_state["to_remove"]
-    if 0 <= idx < len(st.session_state["ordine_articoli"]):
-        st.session_state["ordine_articoli"].pop(idx)
-    st.session_state["to_remove"] = -1
-    st.experimental_rerun()  # forzare il rerun per aggiornare la UI
+# aggiorna la session_state
+st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
 # ===============================
 # 3️⃣ Riepilogo ordine in tempo reale
