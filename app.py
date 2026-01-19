@@ -72,8 +72,8 @@ st.subheader("Aggiungi articoli all'ordine")
 if st.button("➕ Aggiungi articolo"):
     st.session_state["ordine_articoli"].append({"articolo": None, "qty": 1})
 
-# crea le righe dinamiche
-indice_da_rimuovere = None  # per evitare errori quando si elimina
+# crea le righe dinamiche con rimozione sicura
+nuovo_ordine_articoli = []
 for i, item in enumerate(st.session_state["ordine_articoli"]):
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
@@ -83,7 +83,7 @@ for i, item in enumerate(st.session_state["ordine_articoli"]):
             index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
             key=f"art{i}"
         )
-        st.session_state["ordine_articoli"][i]["articolo"] = articolo_scelto
+        item["articolo"] = articolo_scelto
     with col2:
         qty = st.number_input(
             f"Quantità {i+1}",
@@ -91,15 +91,14 @@ for i, item in enumerate(st.session_state["ordine_articoli"]):
             value=item["qty"],
             key=f"qty{i}"
         )
-        st.session_state["ordine_articoli"][i]["qty"] = int(qty)
+        item["qty"] = int(qty)
     with col3:
-        if st.button("❌", key=f"del{i}"):
-            indice_da_rimuovere = i
+        if not st.button("❌", key=f"del{i}"):
+            # mantieni l'articolo solo se NON viene eliminato
+            nuovo_ordine_articoli.append(item)
 
-# Rimuovi l'articolo dopo il ciclo
-if indice_da_rimuovere is not None:
-    st.session_state["ordine_articoli"].pop(indice_da_rimuovere)
-    st.experimental_rerun()
+# aggiorna la session_state senza ricaricare la pagina
+st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
 # ===============================
 # 3️⃣ Riepilogo ordine in tempo reale
