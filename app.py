@@ -24,9 +24,19 @@ with col2:
 st.divider()
 
 # ===============================
+# Caching per evitare troppi accessi a Google Sheets
+@st.cache_data(ttl=300)
+def load_clienti(credentials):
+    return get_clienti(credentials)
+
+@st.cache_data(ttl=300)
+def load_articoli(credentials):
+    return get_articoli(credentials)
+
+# ===============================
 # 1️⃣ Selezione cliente
 try:
-    clienti = get_clienti(credentials)
+    clienti = load_clienti(credentials)
 except Exception:
     st.error("Errore nel leggere i clienti dal foglio Google Sheets. Controlla ID foglio e permessi.")
     st.stop()
@@ -40,7 +50,7 @@ cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
 # ===============================
 # 2️⃣ Aggiunta articoli dinamica
 try:
-    articoli = get_articoli(credentials)
+    articoli = load_articoli(credentials)
 except Exception:
     st.error("Errore nel leggere gli articoli dal foglio Google Sheets. Controlla ID foglio e permessi.")
     st.stop()
@@ -49,7 +59,7 @@ if not articoli:
     st.warning("Nessun articolo trovato!")
     st.stop()
 
-# inizializza lista articoli nell session_state
+# inizializza lista articoli nel session_state
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
