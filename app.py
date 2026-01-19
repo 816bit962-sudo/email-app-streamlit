@@ -27,7 +27,7 @@ st.divider()
 # 1️⃣ Selezione cliente
 try:
     clienti = get_clienti(credentials)
-except Exception as e:
+except Exception:
     st.error("Errore nel leggere i clienti dal foglio Google Sheets. Controlla ID foglio e permessi.")
     st.stop()
 
@@ -38,10 +38,10 @@ if not clienti:
 cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
 
 # ===============================
-# 2️⃣ Aggiunta articoli
+# 2️⃣ Aggiunta articoli dinamica
 try:
     articoli = get_articoli(credentials)
-except Exception as e:
+except Exception:
     st.error("Errore nel leggere gli articoli dal foglio Google Sheets. Controlla ID foglio e permessi.")
     st.stop()
 
@@ -49,34 +49,51 @@ if not articoli:
     st.warning("Nessun articolo trovato!")
     st.stop()
 
-ordine = []
+# inizializza lista articoli nell session_state
+if "ordine_articoli" not in st.session_state:
+    st.session_state["ordine_articoli"] = []
+
 st.subheader("Aggiungi articoli all'ordine")
 
-num_righe = st.number_input(
-    "Quanti articoli vuoi aggiungere?", min_value=1, max_value=20, value=3
-)
+# pulsante per aggiungere una nuova riga articolo
+if st.button("➕ Aggiungi articolo"):
+    st.session_state["ordine_articoli"].append({"articolo": None, "qty": 1})
 
-for i in range(num_righe):
-    col1, col2 = st.columns([3, 1])
+# crea le righe dinamiche
+for i, item in enumerate(st.session_state["ordine_articoli"]):
+    col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
-        articolo = st.selectbox(
-            f"Articolo {i+1}", [a["Descrizione"] for a in articoli], key=f"art{i}"
+        articolo_scelto = st.selectbox(
+            f"Articolo {i+1}", [a["Descrizione"] for a in articoli],
+            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
+            key=f"art{i}"
         )
+        st.session_state["ordine_articoli"][i]["articolo"] = articolo_scelto
     with col2:
         qty = st.number_input(
-            f"Quantità {i+1}", min_value=0, step=1, format="%d", key=f"qty{i}"
+            f"Quantità {i+1}",
+            min_value=0, step=1, format="%d",
+            value=item["qty"],
+            key=f"qty{i}"
         )
-
-    if qty > 0:
-        art = next(a for a in articoli if a["Descrizione"] == articolo)
-        ordine.append({
-            "IdArticolo": art["IdArticolo"],
-            "Descrizione": articolo,
-            "Quantita": int(qty)  # forza intero
-        })
+        st.session_state["ordine_articoli"][i]["qty"] = int(qty)
+    with col3:
+        if st.button("❌", key=f"del{i}"):
+            st.session_state["ordine_articoli"].pop(i)
+            st.experimental_rerun()
 
 # ===============================
-# 3️⃣ Riepilogo ordine
+# 3️⃣ Riepilogo ordine in tempo reale
+ordine = []
+for item in st.session_state["ordine_articoli"]:
+    if item["articolo"] and item["qty"] > 0:
+        art = next(a for a in articoli if a["Descrizione"] == item["articolo"])
+        ordine.append({
+            "IdArticolo": art["IdArticolo"],
+            "Descrizione": art["Descrizione"],
+            "Quantita": int(item["qty"])
+        })
+
 if ordine:
     st.subheader("Riepilogo ordine")
     for item in ordine:
@@ -103,5 +120,7 @@ if st.button("📧 Invia ordine"):
             send_email(credentials, destinatario, f"Nuovo ordine #{id_ordine}", corpo_email)
 
             st.success(f"Ordine #{id_ordine} inviato correttamente a {destinatario}!")
+            # reset della lista articoli dopo invio
+            st.session_state["ordine_articoli"] = []
         except Exception as e:
             st.error(f"Errore nell'inviare l'ordine: {e}")
