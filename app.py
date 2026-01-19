@@ -64,7 +64,7 @@ if st.button("📧 Invia ordine"):
         id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine)
 
         # invia email a destinatario predefinito
-        destinatario = "ordini@azienda.com"
+        destinatario = "lucamantini2009@gmail.com"
         corpo_email = f"Ordine #{id_ordine} di {email} per cliente {cliente_scelto}:\n\n"
         for item in ordine:
             corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
