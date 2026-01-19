@@ -3,7 +3,7 @@ from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 from datetime import datetime
-import traceback  # per debug dettagliato
+import traceback
 
 st.set_page_config(page_title="Ordini Aziendali", page_icon="📦")
 st.title("📦 Sistema Ordini Aziendali")
@@ -35,17 +35,12 @@ def load_articoli(_credentials):
     return get_articoli(_credentials)
 
 # ===============================
-# 1️⃣ Selezione cliente con debug
+# 1️⃣ Selezione cliente
 try:
-    st.write("DEBUG: Credenziali caricate correttamente")
     clienti = load_clienti(credentials)
-    st.write("DEBUG: Clienti caricati:", clienti)
 except Exception as e:
     st.error("❌ Errore nel leggere i clienti dal foglio Google Sheets!")
-    st.error(f"Tipo errore: {type(e).__name__}")
-    st.error(f"Messaggio errore: {e}")
-    st.text("Traceback completo:")
-    st.text(traceback.format_exc())
+    st.error(f"Dettaglio errore: {e}")
     st.stop()
 
 if not clienti:
@@ -55,17 +50,12 @@ if not clienti:
 cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
 
 # ===============================
-# 2️⃣ Aggiunta articoli dinamica con debug
+# 2️⃣ Aggiunta articoli dinamica
 try:
-    st.write("DEBUG: Caricamento articoli...")
     articoli = load_articoli(credentials)
-    st.write("DEBUG: Articoli caricati:", articoli)
 except Exception as e:
     st.error("❌ Errore nel leggere gli articoli dal foglio Google Sheets!")
-    st.error(f"Tipo errore: {type(e).__name__}")
-    st.error(f"Messaggio errore: {e}")
-    st.text("Traceback completo:")
-    st.text(traceback.format_exc())
+    st.error(f"Dettaglio errore: {e}")
     st.stop()
 
 if not articoli:
@@ -126,15 +116,13 @@ if ordine:
     st.write(f"**Totale articoli:** {totale_articoli}")
 
 # ===============================
-# 4️⃣ Invia ordine con debug completo
+# 4️⃣ Invia ordine
 if st.button("📧 Invia ordine"):
     if not ordine:
         st.warning("⚠️ Devi aggiungere almeno un articolo!")
     else:
         try:
-            st.write("DEBUG: Creazione ordine su Google Sheets...")
             id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine)
-            st.write(f"DEBUG: Ordine creato con Id {id_ordine}")
 
             # invia email a destinatario predefinito
             destinatario = "lucamantini2009@gmail.com"
@@ -142,7 +130,6 @@ if st.button("📧 Invia ordine"):
             for item in ordine:
                 corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
 
-            st.write("DEBUG: Invio email a", destinatario)
             send_email(credentials, destinatario, f"Nuovo ordine #{id_ordine}", corpo_email)
             st.success(f"✅ Ordine #{id_ordine} inviato correttamente a {destinatario}!")
 
@@ -151,7 +138,4 @@ if st.button("📧 Invia ordine"):
 
         except Exception as e:
             st.error("❌ Errore durante l'invio dell'ordine!")
-            st.error(f"Tipo errore: {type(e).__name__}")
-            st.error(f"Messaggio errore: {e}")
-            st.text("Traceback completo:")
-            st.text(traceback.format_exc())
+            st.error(f"Dettaglio errore: {e}")
