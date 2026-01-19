@@ -73,9 +73,8 @@ if st.button("➕ Aggiungi articolo"):
     st.session_state["ordine_articoli"].append({"id": str(uuid.uuid4()), "articolo": None, "qty": 1})
 
 # crea le righe dinamiche con rimozione sicura
-aggiornare = False
+# Nota: non usiamo più st.experimental_rerun()
 nuovo_ordine_articoli = []
-
 for item in st.session_state["ordine_articoli"]:
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
@@ -96,17 +95,11 @@ for item in st.session_state["ordine_articoli"]:
         item["qty"] = int(qty)
     with col3:
         elimina = st.button("❌", key=f"del-{item['id']}")
-        if elimina:
-            aggiornare = True
-        else:
+        if not elimina:
             nuovo_ordine_articoli.append(item)
 
 # aggiorna la session_state
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
-
-# forza ridisegno della pagina se abbiamo eliminato un articolo
-if aggiornare:
-    st.experimental_rerun()
 
 # ===============================
 # 3️⃣ Riepilogo ordine in tempo reale
