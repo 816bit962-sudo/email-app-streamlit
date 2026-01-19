@@ -27,19 +27,19 @@ st.divider()
 # ===============================
 # Caching per evitare troppi accessi a Google Sheets
 @st.cache_data(ttl=300)
-def load_clienti(credentials):
-    return get_clienti(credentials)
+def load_clienti(_credentials):
+    return get_clienti(_credentials)
 
 @st.cache_data(ttl=300)
-def load_articoli(credentials):
-    return get_articoli(credentials)
+def load_articoli(_credentials):
+    return get_articoli(_credentials)
 
 # ===============================
 # 1️⃣ Selezione cliente con debug
 try:
-    st.write("DEBUG: Credenziali:", credentials)
+    st.write("DEBUG: Credenziali caricate correttamente")
     clienti = load_clienti(credentials)
-    st.write("DEBUG: Clienti caricati correttamente:", clienti)
+    st.write("DEBUG: Clienti caricati:", clienti)
 except Exception as e:
     st.error("❌ Errore nel leggere i clienti dal foglio Google Sheets!")
     st.error(f"Tipo errore: {type(e).__name__}")
@@ -59,7 +59,7 @@ cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
 try:
     st.write("DEBUG: Caricamento articoli...")
     articoli = load_articoli(credentials)
-    st.write("DEBUG: Articoli caricati correttamente:", articoli)
+    st.write("DEBUG: Articoli caricati:", articoli)
 except Exception as e:
     st.error("❌ Errore nel leggere gli articoli dal foglio Google Sheets!")
     st.error(f"Tipo errore: {type(e).__name__}")
@@ -87,7 +87,8 @@ for i, item in enumerate(st.session_state["ordine_articoli"]):
     col1, col2, col3 = st.columns([4, 2, 1])
     with col1:
         articolo_scelto = st.selectbox(
-            f"Articolo {i+1}", [a["Descrizione"] for a in articoli],
+            f"Articolo {i+1}",
+            [a["Descrizione"] for a in articoli],
             index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
             key=f"art{i}"
         )
