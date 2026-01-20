@@ -96,11 +96,21 @@ nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
     with st.container():
-        # Rileviamo larghezza della finestra per gestire responsive
-        is_mobile = st.runtime.exists() and st.runtime.is_mobile if hasattr(st, "runtime") else False
+        # Layout responsivo usando CSS per mobile
+        st.markdown("""
+        <style>
+        @media (max-width: 600px) {
+            .mobile-row { display: flex; flex-direction: column; }
+            .mobile-row > div { margin-bottom: 5px; }
+        }
+        @media (min-width: 601px) {
+            .mobile-row { display: flex; flex-direction: row; gap: 10px; align-items: center; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        if not is_mobile:
-            # Layout PC: descrizione, quantità, elimina sulla stessa riga
+        row = st.container()
+        with row:
             cols = st.columns([4, 1, 1])
             articolo_scelto = cols[0].selectbox(
                 "Articolo",
@@ -119,28 +129,6 @@ for item in st.session_state["ordine_articoli"]:
                 key=f"qty-{item['id']}"
             )
             elimina = cols[2].button(
-                "🗑️",
-                key=f"del-{item['id']}",
-                help="Elimina articolo"
-            )
-        else:
-            # Layout mobile: descrizione su una riga, quantità ed elimina sulla successiva
-            articolo_scelto = st.selectbox(
-                "Articolo",
-                [a["Descrizione"] for a in articoli],
-                index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
-                key=f"art-{item['id']}"
-            )
-            cols = st.columns([1, 1])
-            qty = cols[0].number_input(
-                "Qtà",
-                min_value=0,
-                step=1,
-                value=item["qty"],
-                format="%d",
-                key=f"qty-{item['id']}"
-            )
-            elimina = cols[1].button(
                 "🗑️",
                 key=f"del-{item['id']}",
                 help="Elimina articolo"
