@@ -4,13 +4,22 @@ from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import uuid
 
-st.set_page_config("Ordini Aziendali", "📦", layout="centered")
+# ===============================
+# CONFIG
+st.set_page_config(
+    page_title="Ordini Aziendali",
+    page_icon="📦",
+    layout="centered"
+)
+
 st.title("📦 Ordini Aziendali")
 
+# ===============================
 # LOGIN
 email = google_login()
 credentials = get_credentials()
 
+# HEADER UTENTE (compatto)
 col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
@@ -34,108 +43,151 @@ def load_clienti(_credentials):
 def load_articoli(_credentials):
     return get_articoli(_credentials)
 
+# ===============================
+# CLIENTE
+st.subheader("👥 Cliente")
+
 try:
     clienti = load_clienti(credentials)
-    articoli = load_articoli(credentials)
 except Exception as e:
-    st.error("❌ Errore nel leggere dati")
+    st.error("❌ Errore nel leggere i clienti")
     st.error(e)
     st.stop()
 
-if not clienti or not articoli:
-    st.warning("⚠️ Nessun cliente o articolo trovato")
+if not clienti:
+    st.warning("⚠️ Nessun cliente trovato")
     st.stop()
 
-# ===============================
-# CLIENTE
-cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
+cliente_scelto = st.selectbox(
+    "Seleziona cliente",
+    [c["Nome"] for c in clienti]
+)
+
 st.divider()
 
 # ===============================
-# ORDINE: centralizza stato
-if "ordine" not in st.session_state:
-    st.session_state["ordine"] = []
+# ARTICOLI
+st.subheader("🧾 Articoli ordine")
 
-# Pulsante aggiungi articolo
+try:
+    articoli = load_articoli(credentials)
+except Exception as e:
+    st.error("❌ Errore nel leggere gli articoli")
+    st.error(e)
+    st.stop()
+
+if not articoli:
+    st.warning("⚠️ Nessun articolo trovato")
+    st.stop()
+
+if "ordine_articoli" not in st.session_state:
+    st.session_state["ordine_articoli"] = []
+
+# Pulsante aggiunta articolo
 if st.button("➕ Aggiungi articolo", use_container_width=True):
-    st.session_state["ordine"].append({
+    st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
         "articolo": None,
         "qty": 1
     })
 
-# ===============================
-# COMPONENTE: riga articolo
-def articolo_row(item, articoli, mobile=False):
-    if not mobile:
-        cols = st.columns([4, 1, 1])
-        articolo = cols[0].selectbox(
+# Righe articolo (card)
+nuovo_ordine_articoli = []
+
+for item in st.session_state["ordine_articoli"]:
+    with st.container(border=True):
+        # Usando columns responsivamente
+        cols = st.columns([4, 1])  # descrizione larga, quantità stretta
+
+        # Colonna descrizione
+        articolo_scelto = cols[0].selectbox(
             "Articolo",
             [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
-            key=f"art-{item['id']}",
-            label_visibility="collapsed"
+            index=[a["Descrizione"] for a in articoli].index(item["articolo"])
+            if item["articolo"] else 0,
+            label_visibility="collapsed",
+            key=f"art-{item['id']}"
         )
+
+        # Colonna quantità
         qty = cols[1].number_input(
             "Qtà",
             min_value=0,
-            value=item["qty"],
             step=1,
-            key=f"qty-{item['id']}",
-            label_visibility="collapsed"
+            value=item["qty"],
+            format="%d",
+            label_visibility="collapsed",
+            key=f"qty-{item['id']}"
         )
-        elimina = cols[2].button("🗑️", key=f"del-{item['id']}")
-    else:
-        st.selectbox(
-            "Articolo",
-            [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
-            key=f"art-{item['id']}"
-        )
-        col_qty, col_del = st.columns([1, 1])
-        qty = col_qty.number_input("Qtà", min_value=0, value=item["qty"], step=1, key=f"qty-{item['id']}")
-        elimina = col_del.button("🗑️", key=f"del-{item['id']}")
-    return articolo, qty, elimina
 
-# ===============================
-# Render ordine
-nuovo_ordine = []
-mobile = st.session_state.get("mobile_mode", False)
+        nuovo_ordine_articoli.append({
+            "id": item["id"],
+            "articolo": articolo_scelto,
+            "qty": int(qty)
+        })
 
-for item in st.session_state["ordine"]:
-    art, qty, elimina = articolo_row(item, articoli, mobile)
-    if not elimina:
-        nuovo_ordine.append({"id": item["id"], "articolo": art, "qty": qty})
-
-st.session_state["ordine"] = nuovo_ordine
+st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
 # ===============================
 # RIEPILOGO
-ordine_finale = []
-for item in st.session_state["ordine"]:
-    if item["articolo"] and item["qty"] > 0:
-        art_obj = next(a for a in articoli if a["Descrizione"] == item["articolo"])
-        ordine_finale.append({"IdArticolo": art_obj["IdArticolo"], "Descrizione": art_obj["Descrizione"], "Quantita": item["qty"]})
+ordine = []
 
-if ordine_finale:
+for item in st.session_state["ordine_articoli"]:
+    if item["articolo"] and item["qty"] > 0:
+        art = next(a for a in articoli if a["Descrizione"] == item["articolo"])
+        ordine.append({
+            "IdArticolo": art["IdArticolo"],
+            "Descrizione": art["Descrizione"],
+            "Quantita": item["qty"]
+        })
+
+if ordine:
     st.subheader("🧾 Riepilogo ordine")
-    for o in ordine_finale:
-        st.write(f"• **{o['Descrizione']}** × {o['Quantita']}")
-    st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in ordine_finale)}")
+    with st.container(border=True):
+        for item in ordine:
+            st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
+        st.divider()
+        st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in ordine)}")
 
 # ===============================
 # INVIO ORDINE
 st.divider()
-if st.button("📧 Invia ordine", type="primary", use_container_width=True, disabled=not ordine_finale):
+
+if st.button(
+    "📧 Invia ordine",
+    type="primary",
+    use_container_width=True,
+    disabled=not ordine
+):
     try:
         with st.spinner("Invio ordine in corso..."):
-            id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine_finale)
-            corpo_email = f"Ordine #{id_ordine}\nUtente: {email}\nCliente: {cliente_scelto}\n\n"
-            for i in ordine_finale:
-                corpo_email += f"{i['Descrizione']} x {i['Quantita']}\n"
-            send_email(credentials, "stefano.mantini@sarp.eu", f"Nuovo ordine #{id_ordine}", corpo_email)
+            id_ordine = crea_ordine(
+                credentials,
+                email,
+                cliente_scelto,
+                ordine
+            )
+
+            destinatario = "lucamantini2009@gmail.com"
+            corpo_email = (
+                f"Ordine #{id_ordine}\n"
+                f"Utente: {email}\n"
+                f"Cliente: {cliente_scelto}\n\n"
+            )
+
+            for item in ordine:
+                corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
+
+            send_email(
+                credentials,
+                destinatario,
+                f"Nuovo ordine #{id_ordine}",
+                corpo_email
+            )
+
         st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
-        st.session_state["ordine"] = []
+        st.session_state["ordine_articoli"] = []
+
     except Exception as e:
-        st.error("❌ Errore durante l'invio")
+        st.error("❌ Errore durante l'invio dell'ordine")
         st.error(e)
