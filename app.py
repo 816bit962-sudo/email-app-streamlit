@@ -2,30 +2,39 @@ import streamlit as st
 from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
-from datetime import datetime
 import uuid
 
-st.set_page_config(page_title="Ordini Aziendali", page_icon="📦")
-st.title("📦 Sistema Ordini Aziendali")
+# ===============================
+# CONFIG
+st.set_page_config(
+    page_title="Ordini Aziendali",
+    page_icon="📦",
+    layout="centered"
+)
 
-# --- Login ---
+st.title("📦 Ordini Aziendali")
+
+# ===============================
+# LOGIN
 email = google_login()
 credentials = get_credentials()
 
-# 👤 header utente
-col1, col2 = st.columns([1, 4])
+# HEADER UTENTE (compatto)
+col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
-        st.image(st.session_state["picture"], width=64)
+        st.image(st.session_state["picture"], width=40)
 with col2:
-    st.success(f"Loggato come {email}")
+    st.caption(f"👤 {email}")
+
+with st.expander("⚙️ Account"):
     if st.button("🚪 Logout"):
         logout()
 
 st.divider()
 
 # ===============================
-# Caching per evitare troppi accessi a Google Sheets
+# CACHE GOOGLE SHEETS
 @st.cache_data(ttl=300)
 def load_clienti(_credentials):
     return get_clienti(_credentials)
@@ -35,112 +44,147 @@ def load_articoli(_credentials):
     return get_articoli(_credentials)
 
 # ===============================
-# 1️⃣ Selezione cliente
+# CLIENTE
+st.subheader("👥 Cliente")
+
 try:
     clienti = load_clienti(credentials)
 except Exception as e:
-    st.error("❌ Errore nel leggere i clienti dal foglio Google Sheets!")
-    st.error(f"Dettaglio errore: {e}")
+    st.error("❌ Errore nel leggere i clienti")
+    st.error(e)
     st.stop()
 
 if not clienti:
-    st.warning("⚠️ Nessun cliente trovato!")
+    st.warning("⚠️ Nessun cliente trovato")
     st.stop()
 
-cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
+cliente_scelto = st.selectbox(
+    "Seleziona cliente",
+    [c["Nome"] for c in clienti]
+)
+
+st.divider()
 
 # ===============================
-# 2️⃣ Aggiunta articoli dinamica
+# ARTICOLI
+st.subheader("🧾 Articoli ordine")
+
 try:
     articoli = load_articoli(credentials)
 except Exception as e:
-    st.error("❌ Errore nel leggere gli articoli dal foglio Google Sheets!")
-    st.error(f"Dettaglio errore: {e}")
+    st.error("❌ Errore nel leggere gli articoli")
+    st.error(e)
     st.stop()
 
 if not articoli:
-    st.warning("⚠️ Nessun articolo trovato!")
+    st.warning("⚠️ Nessun articolo trovato")
     st.stop()
 
-# inizializza lista articoli nel session_state
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
-st.subheader("Aggiungi articoli all'ordine")
+# Pulsante aggiunta articolo
+if st.button("➕ Aggiungi articolo", use_container_width=True):
+    st.session_state["ordine_articoli"].append({
+        "id": str(uuid.uuid4()),
+        "articolo": None,
+        "qty": 1
+    })
 
-# pulsante per aggiungere una nuova riga articolo
-if st.button("➕ Aggiungi articolo"):
-    st.session_state["ordine_articoli"].append({"id": str(uuid.uuid4()), "articolo": None, "qty": 1})
-
-# crea le righe dinamiche con rimozione sicura
-# Nota: non usiamo più st.experimental_rerun()
+# Righe articolo (card)
 nuovo_ordine_articoli = []
+
 for item in st.session_state["ordine_articoli"]:
-    col1, col2, col3 = st.columns([4, 2, 1])
-    with col1:
+    with st.container(border=True):
+
         articolo_scelto = st.selectbox(
             "Articolo",
             [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
+            index=[a["Descrizione"] for a in articoli].index(item["articolo"])
+            if item["articolo"] else 0,
             key=f"art-{item['id']}"
         )
-        item["articolo"] = articolo_scelto
-    with col2:
+
         qty = st.number_input(
             "Quantità",
-            min_value=0, step=1, format="%d",
+            min_value=0,
+            step=1,
             value=item["qty"],
+            format="%d",
             key=f"qty-{item['id']}"
         )
-        item["qty"] = int(qty)
-    with col3:
-        elimina = st.button("❌", key=f"del-{item['id']}")
-        if not elimina:
-            nuovo_ordine_articoli.append(item)
 
-# aggiorna la session_state
+        if st.button("❌ Rimuovi articolo", key=f"del-{item['id']}"):
+            continue
+
+        nuovo_ordine_articoli.append({
+            "id": item["id"],
+            "articolo": articolo_scelto,
+            "qty": int(qty)
+        })
+
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
 # ===============================
-# 3️⃣ Riepilogo ordine in tempo reale
+# RIEPILOGO
 ordine = []
+
 for item in st.session_state["ordine_articoli"]:
     if item["articolo"] and item["qty"] > 0:
         art = next(a for a in articoli if a["Descrizione"] == item["articolo"])
         ordine.append({
             "IdArticolo": art["IdArticolo"],
             "Descrizione": art["Descrizione"],
-            "Quantita": int(item["qty"])
+            "Quantita": item["qty"]
         })
 
 if ordine:
-    st.subheader("Riepilogo ordine")
-    for item in ordine:
-        st.write(f"{item['Descrizione']} x {item['Quantita']}")
-    totale_articoli = sum([item['Quantita'] for item in ordine])
-    st.write(f"**Totale articoli:** {totale_articoli}")
+    st.subheader("🧾 Riepilogo ordine")
+    with st.container(border=True):
+        for item in ordine:
+            st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
+        st.divider()
+        st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in ordine)}")
 
 # ===============================
-# 4️⃣ Invia ordine
-if st.button("📧 Invia ordine"):
-    if not ordine:
-        st.warning("⚠️ Devi aggiungere almeno un articolo!")
-    else:
-        try:
-            id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine)
+# INVIO ORDINE
+st.divider()
 
-            # invia email a destinatario predefinito
+if st.button(
+    "📧 Invia ordine",
+    type="primary",
+    use_container_width=True,
+    disabled=not ordine
+):
+    try:
+        with st.spinner("Invio ordine in corso..."):
+            id_ordine = crea_ordine(
+                credentials,
+                email,
+                cliente_scelto,
+                ordine
+            )
+
             destinatario = "lucamantini2009@gmail.com"
-            corpo_email = f"Ordine #{id_ordine} di {email} per cliente {cliente_scelto}:\n\n"
+            corpo_email = (
+                f"Ordine #{id_ordine}\n"
+                f"Utente: {email}\n"
+                f"Cliente: {cliente_scelto}\n\n"
+            )
+
             for item in ordine:
                 corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
 
-            send_email(credentials, destinatario, f"Nuovo ordine #{id_ordine}", corpo_email)
-            st.success(f"✅ Ordine #{id_ordine} inviato correttamente a {destinatario}!")
+            send_email(
+                credentials,
+                destinatario,
+                f"Nuovo ordine #{id_ordine}",
+                corpo_email
+            )
 
-            # reset della lista articoli dopo invio
-            st.session_state["ordine_articoli"] = []
+        st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
+        st.session_state["ordine_articoli"] = []
 
-        except Exception as e:
-            st.error("❌ Errore durante l'invio dell'ordine!")
-            st.error(f"Dettaglio errore: {e}")
+    except Exception as e:
+        st.error("❌ Errore durante l'invio dell'ordine")
+        st.error(e)
