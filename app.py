@@ -1,10 +1,10 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import uuid
-import json
+import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # ===============================
 # CONFIG
@@ -21,6 +21,7 @@ st.title("📦 Ordini Aziendali")
 email = google_login()
 credentials = get_credentials()
 
+# HEADER UTENTE (compatto)
 col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
@@ -35,7 +36,7 @@ with st.expander("⚙️ Account"):
 st.divider()
 
 # ===============================
-# CACHE
+# CACHE GOOGLE SHEETS
 @st.cache_data(ttl=300)
 def load_clienti(_credentials):
     return get_clienti(_credentials)
@@ -48,7 +49,17 @@ def load_articoli(_credentials):
 # CLIENTE
 st.subheader("👥 Cliente")
 
-clienti = load_clienti(credentials)
+try:
+    clienti = load_clienti(credentials)
+except Exception as e:
+    st.error("❌ Errore nel leggere i clienti")
+    st.error(e)
+    st.stop()
+
+if not clienti:
+    st.warning("⚠️ Nessun cliente trovato")
+    st.stop()
+
 cliente_scelto = st.selectbox(
     "Seleziona cliente",
     [c["Nome"] for c in clienti]
@@ -57,120 +68,139 @@ cliente_scelto = st.selectbox(
 st.divider()
 
 # ===============================
-# ARTICOLI
+# ARTICOLI ORDINE - AgGrid
 st.subheader("🧾 Articoli ordine")
 
-articoli = load_articoli(credentials)
-articoli_map = {a["IdArticolo"]: a["Descrizione"] for a in articoli}
+try:
+    articoli = load_articoli(credentials)
+except Exception as e:
+    st.error("❌ Errore nel leggere gli articoli")
+    st.error(e)
+    st.stop()
 
+if not articoli:
+    st.warning("⚠️ Nessun articolo trovato")
+    st.stop()
+
+# Lista articoli in sessione
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
+# Pulsante aggiunta articolo
 if st.button("➕ Aggiungi articolo", use_container_width=True):
     st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
-        "IdArticolo": list(articoli_map.keys())[0],
+        "articolo": "",
         "qty": 1
     })
 
 # ===============================
-# RIGHE ARTICOLO HTML (UNA SOLA RIGA GARANTITA)
-nuovo_ordine = []
+# PREPARO DATAFRAME per AgGrid
+df = pd.DataFrame([
+    {
+        "Id": item["id"],
+        "Articolo": item["articolo"] or "",
+        "Quantita": item["qty"]
+    } for item in st.session_state["ordine_articoli"]
+])
 
-for idx, item in enumerate(st.session_state["ordine_articoli"]):
-    key = f"row-{item['id']}"
+# Aggiungo opzione ❌ come colonna separata
+df["Elimina"] = "❌"
 
-    html = f"""
-    <div style="display:flex; gap:6px; align-items:center;">
-      <select id="art-{key}" style="flex:6; height:42px;">
-        {''.join(
-            f'<option value="{id_}" {"selected" if id_ == item["IdArticolo"] else ""}>{desc}</option>'
-            for id_, desc in articoli_map.items()
-        )}
-      </select>
+# Configurazione AgGrid
+gb = GridOptionsBuilder.from_dataframe(df)
+gb.configure_selection(selection_mode="single", use_checkbox=False)
+gb.configure_column("Articolo", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={
+    "values": [a["Descrizione"] for a in articoli]
+})
+gb.configure_column("Quantita", editable=True)
+gb.configure_column("Elimina", editable=False, cellRenderer="function(params) {return params.value;}", width=60)
+gridOptions = gb.build()
 
-      <input id="qty-{key}" type="number" value="{item['qty']}"
-        min="1"
-        style="flex:1; max-width:60px; height:42px;" />
-
-      <button id="del-{key}" style="height:42px;">❌</button>
-    </div>
-
-    <script>
-    const send = () => {{
-      const data = {{
-        id: "{item['id']}",
-        articolo: document.getElementById("art-{key}").value,
-        qty: document.getElementById("qty-{key}").value,
-        delete: false
-      }};
-      window.parent.postMessage(data, "*");
-    }}
-
-    document.getElementById("art-{key}").onchange = send;
-    document.getElementById("qty-{key}").onchange = send;
-
-    document.getElementById("del-{key}").onclick = () => {{
-      window.parent.postMessage({{
-        id: "{item['id']}",
-        delete: true
-      }}, "*");
-    }}
-    </script>
-    """
-
-    components.html(html, height=60)
+# Mostra la tabella
+grid_response = AgGrid(
+    df,
+    gridOptions=gridOptions,
+    update_mode=GridUpdateMode.VALUE_CHANGED,
+    fit_columns_on_grid_load=True,
+    allow_unsafe_jscode=True
+)
 
 # ===============================
-# LISTENER JS → STREAMLIT
-msg = st.session_state.get("_component_msg")
-
-if msg:
-    if msg.get("delete"):
-        st.session_state["ordine_articoli"] = [
-            i for i in st.session_state["ordine_articoli"]
-            if i["id"] != msg["id"]
-        ]
-        st.experimental_rerun()
-    else:
-        for i in st.session_state["ordine_articoli"]:
-            if i["id"] == msg["id"]:
-                i["IdArticolo"] = msg["articolo"]
-                i["qty"] = int(msg["qty"])
-
-# ===============================
-# RIEPILOGO
-ordine = []
-for i in st.session_state["ordine_articoli"]:
-    art = next(a for a in articoli if a["IdArticolo"] == i["IdArticolo"])
-    ordine.append({
-        "IdArticolo": art["IdArticolo"],
-        "Descrizione": art["Descrizione"],
-        "Quantita": i["qty"]
+# AGGIORNO SESSION_STATE dopo modifiche
+ordine_articoli_nuovo = []
+for row in grid_response['data'].to_dict('records'):
+    if row["Elimina"] == "❌" and row.get("_selectedRow", False):
+        # Rimuove selezionando riga ❌
+        continue
+    ordine_articoli_nuovo.append({
+        "id": row["Id"],
+        "articolo": row["Articolo"],
+        "qty": int(row["Quantita"])
     })
 
+st.session_state["ordine_articoli"] = ordine_articoli_nuovo
+
+# ===============================
+# RIEPILOGO ORDINE
+ordine = []
+
+for item in st.session_state["ordine_articoli"]:
+    if item["articolo"] and item["qty"] > 0:
+        art = next(a for a in articoli if a["Descrizione"] == item["articolo"])
+        ordine.append({
+            "IdArticolo": art["IdArticolo"],
+            "Descrizione": art["Descrizione"],
+            "Quantita": item["qty"]
+        })
+
 if ordine:
-    st.subheader("🧾 Riepilogo")
-    for i in ordine:
-        st.write(f"• **{i['Descrizione']}** × {i['Quantita']}")
+    st.subheader("🧾 Riepilogo ordine")
+    with st.container():
+        for item in ordine:
+            st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
+        st.divider()
+        st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in ordine)}")
 
 # ===============================
 # INVIO ORDINE
 st.divider()
 
-if st.button("📧 Invia ordine", type="primary", use_container_width=True):
-    id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine)
+if st.button(
+    "📧 Invia ordine",
+    type="primary",
+    use_container_width=True,
+    disabled=not ordine
+):
+    try:
+        with st.spinner("Invio ordine in corso..."):
+            id_ordine = crea_ordine(
+                credentials,
+                email,
+                cliente_scelto,
+                ordine
+            )
 
-    corpo = f"Ordine #{id_ordine}\nCliente: {cliente_scelto}\n\n"
-    for i in ordine:
-        corpo += f"{i['Descrizione']} x {i['Quantita']}\n"
+            destinatario = "lucamantini2009@gmail.com"
+            corpo_email = (
+                f"Ordine #{id_ordine}\n"
+                f"Utente: {email}\n"
+                f"Cliente: {cliente_scelto}\n\n"
+            )
 
-    send_email(
-        credentials,
-        "lucamantini2009@gmail.com",
-        f"Nuovo ordine #{id_ordine}",
-        corpo
-    )
+            for item in ordine:
+                corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
 
-    st.success("✅ Ordine inviato!")
-    st.session_state["ordine_articoli"] = []
+            send_email(
+                credentials,
+                destinatario,
+                f"Nuovo ordine #{id_ordine}",
+                corpo_email
+            )
+
+        st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
+        st.session_state["ordine_articoli"] = []
+
+    except Exception as e:
+        st.error("❌ Errore durante l'invio dell'ordine")
+        st.error(e)
