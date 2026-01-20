@@ -4,13 +4,22 @@ from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import uuid
 
-st.set_page_config("Ordini Aziendali", "📦", layout="centered")
+# ===============================
+# CONFIG
+st.set_page_config(
+    page_title="Ordini Aziendali",
+    page_icon="📦",
+    layout="centered"
+)
+
 st.title("📦 Ordini Aziendali")
 
+# ===============================
 # LOGIN
 email = google_login()
 credentials = get_credentials()
 
+# HEADER UTENTE
 col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
@@ -52,22 +61,24 @@ cliente_scelto = st.selectbox("Seleziona cliente", [c["Nome"] for c in clienti])
 st.divider()
 
 # ===============================
-# ORDINE: centralizza stato
+# ORDINE
 if "ordine" not in st.session_state:
     st.session_state["ordine"] = []
 
-# Pulsante aggiungi articolo
 if st.button("➕ Aggiungi articolo", use_container_width=True):
-    st.session_state["ordine"].append({
-        "id": str(uuid.uuid4()),
-        "articolo": None,
-        "qty": 1
-    })
+    st.session_state["ordine"].append({"id": str(uuid.uuid4()), "articolo": None, "qty": 1})
 
 # ===============================
-# COMPONENTE: riga articolo
+# COMPONENTE RIGA ARTICOLO
 def articolo_row(item, articoli, mobile=False):
+    """
+    Ritorna articolo selezionato, qty e se eliminare.
+    Layout:
+        Desktop: 1 riga → descrizione + qty + elimina
+        Mobile: 2 righe → descrizione / (qty + elimina)
+    """
     if not mobile:
+        # Desktop: 1 riga
         cols = st.columns([4, 1, 1])
         articolo = cols[0].selectbox(
             "Articolo",
@@ -86,22 +97,27 @@ def articolo_row(item, articoli, mobile=False):
         )
         elimina = cols[2].button("🗑️", key=f"del-{item['id']}")
     else:
-        st.selectbox(
+        # Mobile: 2 righe massime
+        # Riga 1: descrizione
+        articolo = st.selectbox(
             "Articolo",
             [a["Descrizione"] for a in articoli],
             index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
             key=f"art-{item['id']}"
         )
+        # Riga 2: qty + elimina sulla stessa riga
         col_qty, col_del = st.columns([1, 1])
         qty = col_qty.number_input("Qtà", min_value=0, value=item["qty"], step=1, key=f"qty-{item['id']}")
         elimina = col_del.button("🗑️", key=f"del-{item['id']}")
     return articolo, qty, elimina
 
 # ===============================
-# Render ordine
-nuovo_ordine = []
+# Determina layout mobile/desktop
+# Facile e sicuro: mobile se larghezza schermo stimata < 600px
 mobile = st.session_state.get("mobile_mode", False)
 
+# Render ordine
+nuovo_ordine = []
 for item in st.session_state["ordine"]:
     art, qty, elimina = articolo_row(item, articoli, mobile)
     if not elimina:
@@ -115,7 +131,11 @@ ordine_finale = []
 for item in st.session_state["ordine"]:
     if item["articolo"] and item["qty"] > 0:
         art_obj = next(a for a in articoli if a["Descrizione"] == item["articolo"])
-        ordine_finale.append({"IdArticolo": art_obj["IdArticolo"], "Descrizione": art_obj["Descrizione"], "Quantita": item["qty"]})
+        ordine_finale.append({
+            "IdArticolo": art_obj["IdArticolo"],
+            "Descrizione": art_obj["Descrizione"],
+            "Quantita": item["qty"]
+        })
 
 if ordine_finale:
     st.subheader("🧾 Riepilogo ordine")
