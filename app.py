@@ -92,51 +92,15 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
     })
 
 # ===============================
-# FUNZIONE PER LARGHEZZA FINESTRA (JS)
-if "window_width" not in st.session_state:
-    st.session_state["window_width"] = 1000  # default
-
-st.markdown(
-    """
-    <script>
-    const streamlitWindowWidth = () => {
-        const width = window.innerWidth;
-        window.parent.postMessage({type: 'SET_WIDTH', width: width}, '*')
-    }
-    streamlitWindowWidth();
-    window.addEventListener('resize', streamlitWindowWidth);
-    </script>
-    """,
-    unsafe_allow_html=True
-)
-
-# JS listener per salvare larghezza in session_state
-st.experimental_set_query_params()  # serve per trigger di session_state aggiornato
-
-from streamlit.runtime.scriptrunner import add_script_run_ctx
-import streamlit as st
-
-# Listener del messaggio dal JS
-def handle_message():
-    import streamlit.components.v1 as components
-    components.html(
-        """
-        <script>
-        window.addEventListener('message', (event) => {
-            if(event.data.type === 'SET_WIDTH'){
-                fetch(`/_stcore/set_window_width?width=${event.data.width}`);
-            }
-        });
-        </script>
-        """,
-        height=0,
-        scrolling=False
-    )
-handle_message()
-
-# Helper responsive
+# Funzione helper: mobile se <=600px
 def is_mobile():
-    return st.session_state.get("window_width", 1000) < 600
+    # Semplice: usera la dimensione stimata del dispositivo
+    return st.session_state.get("mobile_mode", False)
+
+# Imposta mobile_mode in session_state (una sola volta)
+if "mobile_mode" not in st.session_state:
+    # Approccio semplice: puoi forzare mobile su app piccole
+    st.session_state["mobile_mode"] = False
 
 # ===============================
 # Righe articolo (card)
@@ -144,8 +108,8 @@ nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
     with st.container():
-        if not is_mobile():
-            # Desktop: descrizione + qty + elimina
+        if not st.session_state["mobile_mode"]:
+            # Desktop: 1 riga -> descrizione + qty + elimina
             cols = st.columns([4, 1, 1])
             articolo_scelto = cols[0].selectbox(
                 "Articolo",
@@ -169,7 +133,7 @@ for item in st.session_state["ordine_articoli"]:
                 help="Elimina articolo"
             )
         else:
-            # Mobile: descrizione su 1 riga, qty + elimina sulla riga successiva
+            # Mobile: 2 righe -> descrizione su 1 riga, qty + elimina sulla 2a riga
             articolo_scelto = st.selectbox(
                 "Articolo",
                 [a["Descrizione"] for a in articoli],
