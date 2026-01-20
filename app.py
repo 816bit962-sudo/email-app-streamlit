@@ -19,6 +19,7 @@ st.title("📦 Ordini Aziendali")
 email = google_login()
 credentials = get_credentials()
 
+# HEADER UTENTE (compatto)
 col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
@@ -91,49 +92,58 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
     })
 
 # ===============================
-# Righe compatte con HTML/CSS flex
+# Righe compatte con Streamlit columns ottimizzate
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
-    # Colore e opacità per eliminazione
+    # Colore sfondo se eliminato
     bg_color = "#ffd6d6" if item.get("elimina", False) else "#f9f9f9"
-    opacity = 0.5 if item.get("elimina", False) else 1.0
 
-    # HTML flex container per una sola riga compatta
-    descrizione_val = item["articolo"] if item["articolo"] else "Seleziona articolo"
-    container_html = f"""
-    <div style='
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: {bg_color};
-        opacity: {opacity};
-        padding: 5px;
-        border-radius: 5px;
-        flex-wrap: nowrap;
-    '>
-    <div style='flex:5; min-width:0;'>
-        <select id='select-{item["id"]}' style='width:100%;'>
-            {''.join([f"<option value='{a['Descrizione']}' {'selected' if a['Descrizione']==item['articolo'] else ''}>{a['Descrizione']}</option>" for a in articoli])}
-        </select>
-    </div>
-    <div style='flex:1; margin-left:5px;'>
-        <input type='number' id='qty-{item["id"]}' value='{item["qty"]}' min='0' style='width:100%;'>
-    </div>
-    <div style='flex:0.5; margin-left:5px; text-align:center;'>
-        <input type='checkbox' id='del-{item["id"]}' {'checked' if item.get("elimina", False) else ''}>
-    </div>
-    </div>
-    """
-    st.markdown(container_html, unsafe_allow_html=True)
+    with st.container():
+        st.markdown(
+            f"<div style='background-color:{bg_color}; padding:5px; border-radius:5px;'>",
+            unsafe_allow_html=True
+        )
 
-    # Recupero valori aggiornati tramite session_state con fallback
-    nuovo_ordine_articoli.append({
-        "id": item["id"],
-        "articolo": item["articolo"],
-        "qty": item["qty"],
-        "elimina": item.get("elimina", False)
-    })
+        # Columns compatte: descrizione larga, qty piccola, elimina piccola
+        col_descr, col_qty, col_del = st.columns([6, 1, 1], gap="small")
+
+        # Select con ricerca funzionante
+        articolo_scelto = col_descr.selectbox(
+            "",
+            [a["Descrizione"] for a in articoli],
+            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
+            label_visibility="collapsed",
+            key=f"art-{item['id']}"
+        )
+
+        qty = col_qty.number_input(
+            "",
+            min_value=0,
+            step=1,
+            value=item["qty"],
+            format="%d",
+            label_visibility="collapsed",
+            key=f"qty-{item['id']}"
+        )
+
+        elimina = col_del.checkbox(
+            "",
+            value=item.get("elimina", False),
+            key=f"del-{item['id']}",
+            label_visibility="collapsed"
+        )
+
+        # Aggiungi solo se non eliminato
+        if not elimina:
+            nuovo_ordine_articoli.append({
+                "id": item["id"],
+                "articolo": articolo_scelto,
+                "qty": int(qty),
+                "elimina": False
+            })
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
