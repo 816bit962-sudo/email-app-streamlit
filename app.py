@@ -95,30 +95,59 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
-    with st.container(border=True):
-        # Usando columns responsivamente
-        cols = st.columns([4, 1])  # descrizione larga, quantità stretta
+    with st.container():
+        # Rileviamo larghezza della finestra per gestire responsive
+        is_mobile = st.runtime.exists() and st.runtime.is_mobile if hasattr(st, "runtime") else False
 
-        # Colonna descrizione
-        articolo_scelto = cols[0].selectbox(
-            "Articolo",
-            [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"])
-            if item["articolo"] else 0,
-            label_visibility="collapsed",
-            key=f"art-{item['id']}"
-        )
+        if not is_mobile:
+            # Layout PC: descrizione, quantità, elimina sulla stessa riga
+            cols = st.columns([4, 1, 1])
+            articolo_scelto = cols[0].selectbox(
+                "Articolo",
+                [a["Descrizione"] for a in articoli],
+                index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
+                label_visibility="collapsed",
+                key=f"art-{item['id']}"
+            )
+            qty = cols[1].number_input(
+                "Qtà",
+                min_value=0,
+                step=1,
+                value=item["qty"],
+                format="%d",
+                label_visibility="collapsed",
+                key=f"qty-{item['id']}"
+            )
+            elimina = cols[2].button(
+                "🗑️",
+                key=f"del-{item['id']}",
+                help="Elimina articolo"
+            )
+        else:
+            # Layout mobile: descrizione su una riga, quantità ed elimina sulla successiva
+            articolo_scelto = st.selectbox(
+                "Articolo",
+                [a["Descrizione"] for a in articoli],
+                index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
+                key=f"art-{item['id']}"
+            )
+            cols = st.columns([1, 1])
+            qty = cols[0].number_input(
+                "Qtà",
+                min_value=0,
+                step=1,
+                value=item["qty"],
+                format="%d",
+                key=f"qty-{item['id']}"
+            )
+            elimina = cols[1].button(
+                "🗑️",
+                key=f"del-{item['id']}",
+                help="Elimina articolo"
+            )
 
-        # Colonna quantità
-        qty = cols[1].number_input(
-            "Qtà",
-            min_value=0,
-            step=1,
-            value=item["qty"],
-            format="%d",
-            label_visibility="collapsed",
-            key=f"qty-{item['id']}"
-        )
+        if elimina:
+            continue  # salta questo articolo, non lo aggiunge al nuovo ordine
 
         nuovo_ordine_articoli.append({
             "id": item["id"],
@@ -143,7 +172,7 @@ for item in st.session_state["ordine_articoli"]:
 
 if ordine:
     st.subheader("🧾 Riepilogo ordine")
-    with st.container(border=True):
+    with st.container():
         for item in ordine:
             st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
         st.divider()
