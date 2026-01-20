@@ -96,11 +96,12 @@ nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
     with st.container(border=True):
-        # Righe ultra-smart: selezione articolo + quantità nascosta finché non clicchi
-        col_descr, col_qty = st.columns([5, 1])
+        # layout compatto: descrizione e quantità sulla stessa riga
+        col_descr, col_qty = st.columns([5, 1])  # descrizione larga, qty stretta
 
+        # selezione articolo
         articolo_scelto = col_descr.selectbox(
-            "",
+            "Articolo",
             [a["Descrizione"] for a in articoli],
             index=[a["Descrizione"] for a in articoli].index(item["articolo"])
             if item["articolo"] else 0,
@@ -108,21 +109,16 @@ for item in st.session_state["ordine_articoli"]:
             key=f"art-{item['id']}"
         )
 
-        # Quantità minimale
-        # Se clicchi sul campo appare number_input compatto
-        show_qty = col_qty.checkbox("", key=f"show-qty-{item['id']}", value=True, label_visibility="collapsed")
-        if show_qty:
-            qty = col_qty.number_input(
-                "",
-                min_value=0,
-                step=1,
-                value=item["qty"],
-                format="%d",
-                label_visibility="collapsed",
-                key=f"qty-{item['id']}"
-            )
-        else:
-            qty = item["qty"]
+        # quantità compatta
+        qty = col_qty.number_input(
+            "",
+            min_value=0,
+            step=1,
+            value=item["qty"],
+            format="%d",
+            label_visibility="collapsed",
+            key=f"qty-{item['id']}"
+        )
 
         nuovo_ordine_articoli.append({
             "id": item["id"],
