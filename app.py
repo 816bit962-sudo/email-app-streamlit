@@ -3,8 +3,6 @@ from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import uuid
-import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # ===============================
 # CONFIG
@@ -68,7 +66,7 @@ cliente_scelto = st.selectbox(
 st.divider()
 
 # ===============================
-# ARTICOLI ORDINE - AgGrid
+# ARTICOLI
 st.subheader("🧾 Articoli ordine")
 
 try:
@@ -82,7 +80,6 @@ if not articoli:
     st.warning("⚠️ Nessun articolo trovato")
     st.stop()
 
-# Lista articoli in sessione
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
@@ -90,59 +87,61 @@ if "ordine_articoli" not in st.session_state:
 if st.button("➕ Aggiungi articolo", use_container_width=True):
     st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
-        "articolo": "",
+        "articolo": None,
         "qty": 1
     })
 
+# Righe articolo (card)
+nuovo_ordine_articoli = []
+
+for item in st.session_state["ordine_articoli"]:
+    with st.container():
+        # Colonne principali: articolo+qty e pulsante delete
+        col_main, col_del = st.columns([8, 1])
+
+        with col_main:
+            # Sotto-colonne per articolo e qty sulla stessa riga
+            col_art, col_qty = st.columns([4, 1])
+            with col_art:
+                articolo_scelto = st.selectbox(
+                    "Articolo",
+                    [a["Descrizione"] for a in articoli],
+                    index=[a["Descrizione"] for a in articoli].index(item["articolo"])
+                    if item["articolo"] else 0,
+                    label_visibility="collapsed",
+                    key=f"art-{item['id']}"
+                )
+            with col_qty:
+                qty = st.number_input(
+                    "Qtà",
+                    min_value=0,
+                    step=1,
+                    value=item["qty"],
+                    format="%d",
+                    label_visibility="collapsed",
+                    key=f"qty-{item['id']}"
+                )
+
+        with col_del:
+            # Pulsante delete in basso
+            st.markdown("<div style='height: 100%; display: flex; align-items: flex-end; justify-content: center;'>"
+                        f"<form action='#'><button>❌</button></form></div>",
+                        unsafe_allow_html=True)
+            remove = st.button("❌", key=f"del-{item['id']}")
+
+        if remove:
+            continue
+
+        nuovo_ordine_articoli.append({
+            "id": item["id"],
+            "articolo": articolo_scelto,
+            "qty": int(qty)
+        })
+
+st.session_state["ordine_articoli"] = nuovo_ordine_articoli
+
 # ===============================
-# PREPARO DATAFRAME per AgGrid
-df = pd.DataFrame([
-    {
-        "Id": item["id"],
-        "Articolo": item["articolo"] or "",
-        "Quantita": item["qty"]
-    } for item in st.session_state["ordine_articoli"]
-])
-
-# Aggiungo opzione ❌ come colonna separata
-df["Elimina"] = "❌"
-
-# Configurazione AgGrid
-gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_selection(selection_mode="single", use_checkbox=False)
-gb.configure_column("Articolo", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={
-    "values": [a["Descrizione"] for a in articoli]
-})
-gb.configure_column("Quantita", editable=True)
-gb.configure_column("Elimina", editable=False, cellRenderer="function(params) {return params.value;}", width=60)
-gridOptions = gb.build()
-
-# Mostra la tabella
-grid_response = AgGrid(
-    df,
-    gridOptions=gridOptions,
-    update_mode=GridUpdateMode.VALUE_CHANGED,
-    fit_columns_on_grid_load=True,
-    allow_unsafe_jscode=True
-)
-
-# ===============================
-# AGGIORNO SESSION_STATE dopo modifiche
-ordine_articoli_nuovo = []
-for row in grid_response['data'].to_dict('records'):
-    if row["Elimina"] == "❌" and row.get("_selectedRow", False):
-        # Rimuove selezionando riga ❌
-        continue
-    ordine_articoli_nuovo.append({
-        "id": row["Id"],
-        "articolo": row["Articolo"],
-        "qty": int(row["Quantita"])
-    })
-
-st.session_state["ordine_articoli"] = ordine_articoli_nuovo
-
-# ===============================
-# RIEPILOGO ORDINE
+# RIEPILOGO
 ordine = []
 
 for item in st.session_state["ordine_articoli"]:
@@ -156,7 +155,7 @@ for item in st.session_state["ordine_articoli"]:
 
 if ordine:
     st.subheader("🧾 Riepilogo ordine")
-    with st.container():
+    with st.container(border=True):
         for item in ordine:
             st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
         st.divider()
