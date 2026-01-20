@@ -88,28 +88,31 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
     st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
         "articolo": None,
-        "qty": 1
+        "qty": 1,
+        "elimina": False
     })
 
-# Righe articolo (card)
+# Righe articolo compatte anche su mobile
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
-    with st.container(border=True):
-        # layout compatto: descrizione e quantità sulla stessa riga
-        col_descr, col_qty = st.columns([5, 1])  # descrizione larga, qty stretta
+    bg_color = "#ffd6d6" if item.get("elimina", False) else "#f9f9f9"
 
-        # selezione articolo
+    # Container con colore dinamico
+    with st.container():
+        st.markdown(f"<div style='background-color:{bg_color}; padding:5px; border-radius:5px;'>", unsafe_allow_html=True)
+        
+        # Righe compatte: descrizione, qty, elimina su una singola riga
+        col_descr, col_qty, col_del = st.columns([5, 1, 1])
+
         articolo_scelto = col_descr.selectbox(
-            "Articolo",
+            "",
             [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"])
-            if item["articolo"] else 0,
+            index=[a["Descrizione"] for a in articoli].index(item["articolo"]) if item["articolo"] else 0,
             label_visibility="collapsed",
             key=f"art-{item['id']}"
         )
 
-        # quantità compatta
         qty = col_qty.number_input(
             "",
             min_value=0,
@@ -120,11 +123,23 @@ for item in st.session_state["ordine_articoli"]:
             key=f"qty-{item['id']}"
         )
 
-        nuovo_ordine_articoli.append({
-            "id": item["id"],
-            "articolo": articolo_scelto,
-            "qty": int(qty)
-        })
+        elimina = col_del.checkbox(
+            "",
+            value=item.get("elimina", False),
+            key=f"del-{item['id']}",
+            label_visibility="collapsed"
+        )
+
+        # Aggiorna solo se non eliminato
+        if not elimina:
+            nuovo_ordine_articoli.append({
+                "id": item["id"],
+                "articolo": articolo_scelto,
+                "qty": int(qty),
+                "elimina": False
+            })
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
@@ -168,7 +183,7 @@ if st.button(
                 ordine
             )
 
-            destinatario = "lucamantini2009@gmail.com"
+            destinatario = "stefano.mantini@sarp.eu"
             corpo_email = (
                 f"Ordine #{id_ordine}\n"
                 f"Utente: {email}\n"
