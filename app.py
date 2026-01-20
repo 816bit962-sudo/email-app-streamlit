@@ -15,11 +15,44 @@ st.set_page_config(
 st.title("📦 Ordini Aziendali")
 
 # ===============================
+# CSS PER MOBILE (FORZA RIGA UNICA)
+st.markdown("""
+<style>
+.articolo-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* descrizione */
+.articolo-row > div:nth-child(1) {
+    flex: 6;
+}
+
+/* quantità */
+.articolo-row > div:nth-child(2) {
+    flex: 2;
+    max-width: 80px;
+}
+
+/* elimina */
+.articolo-row > div:nth-child(3) {
+    flex: 1;
+    max-width: 40px;
+}
+
+/* riduce padding interno degli input */
+.articolo-row input {
+    padding: 4px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================
 # LOGIN
 email = google_login()
 credentials = get_credentials()
 
-# HEADER UTENTE (compatto)
 col1, col2 = st.columns([1, 5])
 with col1:
     if "picture" in st.session_state:
@@ -34,7 +67,7 @@ with st.expander("⚙️ Account"):
 st.divider()
 
 # ===============================
-# CACHE GOOGLE SHEETS
+# CACHE
 @st.cache_data(ttl=300)
 def load_clienti(_credentials):
     return get_clienti(_credentials)
@@ -50,12 +83,8 @@ st.subheader("👥 Cliente")
 try:
     clienti = load_clienti(credentials)
 except Exception as e:
-    st.error("❌ Errore nel leggere i clienti")
+    st.error("Errore lettura clienti")
     st.error(e)
-    st.stop()
-
-if not clienti:
-    st.warning("⚠️ Nessun cliente trovato")
     st.stop()
 
 cliente_scelto = st.selectbox(
@@ -72,18 +101,13 @@ st.subheader("🧾 Articoli ordine")
 try:
     articoli = load_articoli(credentials)
 except Exception as e:
-    st.error("❌ Errore nel leggere gli articoli")
+    st.error("Errore lettura articoli")
     st.error(e)
-    st.stop()
-
-if not articoli:
-    st.warning("⚠️ Nessun articolo trovato")
     st.stop()
 
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
-# Pulsante aggiunta articolo
 if st.button("➕ Aggiungi articolo", use_container_width=True):
     st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
@@ -91,13 +115,14 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
         "qty": 1
     })
 
-# Righe articolo (card)
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
     with st.container(border=True):
 
-        col1, col2, col3 = st.columns([6, 2, 1])
+        st.markdown('<div class="articolo-row">', unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             articolo_scelto = st.selectbox(
@@ -112,7 +137,7 @@ for item in st.session_state["ordine_articoli"]:
         with col2:
             qty = st.number_input(
                 "Qtà",
-                min_value=0,
+                min_value=1,
                 step=1,
                 value=item["qty"],
                 format="%d",
@@ -123,6 +148,8 @@ for item in st.session_state["ordine_articoli"]:
         with col3:
             remove = st.button("❌", key=f"del-{item['id']}")
 
+        st.markdown("</div>", unsafe_allow_html=True)
+
         if remove:
             continue
 
@@ -131,7 +158,6 @@ for item in st.session_state["ordine_articoli"]:
             "articolo": articolo_scelto,
             "qty": int(qty)
         })
-
 
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
@@ -149,10 +175,10 @@ for item in st.session_state["ordine_articoli"]:
         })
 
 if ordine:
-    st.subheader("🧾 Riepilogo ordine")
+    st.subheader("🧾 Riepilogo")
     with st.container(border=True):
-        for item in ordine:
-            st.write(f"• **{item['Descrizione']}** × {item['Quantita']}")
+        for i in ordine:
+            st.write(f"• **{i['Descrizione']}** × {i['Quantita']}")
         st.divider()
         st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in ordine)}")
 
@@ -168,12 +194,7 @@ if st.button(
 ):
     try:
         with st.spinner("Invio ordine in corso..."):
-            id_ordine = crea_ordine(
-                credentials,
-                email,
-                cliente_scelto,
-                ordine
-            )
+            id_ordine = crea_ordine(credentials, email, cliente_scelto, ordine)
 
             destinatario = "lucamantini2009@gmail.com"
             corpo_email = (
@@ -182,8 +203,8 @@ if st.button(
                 f"Cliente: {cliente_scelto}\n\n"
             )
 
-            for item in ordine:
-                corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
+            for i in ordine:
+                corpo_email += f"{i['Descrizione']} x {i['Quantita']}\n"
 
             send_email(
                 credentials,
@@ -196,5 +217,5 @@ if st.button(
         st.session_state["ordine_articoli"] = []
 
     except Exception as e:
-        st.error("❌ Errore durante l'invio dell'ordine")
+        st.error("Errore invio ordine")
         st.error(e)
