@@ -95,38 +95,32 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
-    with st.container():
-        # Colonne principali: articolo+qty e pulsante delete
-        col_main, col_del = st.columns([8, 1])
+    with st.container(border=True):
 
-        with col_main:
-            # Sotto-colonne per articolo e qty sulla stessa riga
-            col_art, col_qty = st.columns([4, 1])
-            with col_art:
-                articolo_scelto = st.selectbox(
-                    "Articolo",
-                    [a["Descrizione"] for a in articoli],
-                    index=[a["Descrizione"] for a in articoli].index(item["articolo"])
-                    if item["articolo"] else 0,
-                    label_visibility="collapsed",
-                    key=f"art-{item['id']}"
-                )
-            with col_qty:
-                qty = st.number_input(
-                    "Qtà",
-                    min_value=0,
-                    step=1,
-                    value=item["qty"],
-                    format="%d",
-                    label_visibility="collapsed",
-                    key=f"qty-{item['id']}"
-                )
+        col1, col2, col3 = st.columns([6, 2, 1])
 
-        with col_del:
-            # Pulsante delete in basso
-            st.markdown("<div style='height: 100%; display: flex; align-items: flex-end; justify-content: center;'>"
-                        f"<form action='#'><button>❌</button></form></div>",
-                        unsafe_allow_html=True)
+        with col1:
+            articolo_scelto = st.selectbox(
+                "Articolo",
+                [a["Descrizione"] for a in articoli],
+                index=[a["Descrizione"] for a in articoli].index(item["articolo"])
+                if item["articolo"] else 0,
+                label_visibility="collapsed",
+                key=f"art-{item['id']}"
+            )
+
+        with col2:
+            qty = st.number_input(
+                "Qtà",
+                min_value=0,
+                step=1,
+                value=item["qty"],
+                format="%d",
+                label_visibility="collapsed",
+                key=f"qty-{item['id']}"
+            )
+
+        with col3:
             remove = st.button("❌", key=f"del-{item['id']}")
 
         if remove:
@@ -137,6 +131,7 @@ for item in st.session_state["ordine_articoli"]:
             "articolo": articolo_scelto,
             "qty": int(qty)
         })
+
 
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
