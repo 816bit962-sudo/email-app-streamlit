@@ -88,21 +88,17 @@ if st.button("➕ Aggiungi articolo", use_container_width=True):
     st.session_state["ordine_articoli"].append({
         "id": str(uuid.uuid4()),
         "articolo": None,
-        "qty": 1,
-        "elimina": False
+        "qty": 1
     })
 
-# Righe articolo (collapsible super minimalista)
+# Righe articolo (card)
 nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
-    # Titolo collapsible = descrizione articolo
-    descrizione_iniziale = item["articolo"] if item["articolo"] else "Seleziona articolo"
-    with st.expander(descrizione_iniziale, expanded=True):
-        # Layout compatto per modificare articolo e quantità
-        col_descr, col_qty, col_del = st.columns([5, 1, 1])
+    with st.container(border=True):
+        # Righe ultra-smart: selezione articolo + quantità nascosta finché non clicchi
+        col_descr, col_qty = st.columns([5, 1])
 
-        # Selezione articolo
         articolo_scelto = col_descr.selectbox(
             "",
             [a["Descrizione"] for a in articoli],
@@ -112,27 +108,27 @@ for item in st.session_state["ordine_articoli"]:
             key=f"art-{item['id']}"
         )
 
-        # Quantità
-        qty = col_qty.number_input(
-            "",
-            min_value=0,
-            step=1,
-            value=item["qty"],
-            format="%d",
-            label_visibility="collapsed",
-            key=f"qty-{item['id']}"
-        )
+        # Quantità minimale
+        # Se clicchi sul campo appare number_input compatto
+        show_qty = col_qty.checkbox("", key=f"show-qty-{item['id']}", value=True, label_visibility="collapsed")
+        if show_qty:
+            qty = col_qty.number_input(
+                "",
+                min_value=0,
+                step=1,
+                value=item["qty"],
+                format="%d",
+                label_visibility="collapsed",
+                key=f"qty-{item['id']}"
+            )
+        else:
+            qty = item["qty"]
 
-        # Checkbox elimina
-        elimina = col_del.checkbox("", key=f"del-{item['id']}", label_visibility="collapsed")
-
-        # Aggiungi solo se non selezionato elimina
-        if not elimina:
-            nuovo_ordine_articoli.append({
-                "id": item["id"],
-                "articolo": articolo_scelto,
-                "qty": int(qty)
-            })
+        nuovo_ordine_articoli.append({
+            "id": item["id"],
+            "articolo": articolo_scelto,
+            "qty": int(qty)
+        })
 
 st.session_state["ordine_articoli"] = nuovo_ordine_articoli
 
