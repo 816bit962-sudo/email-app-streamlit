@@ -96,30 +96,31 @@ nuovo_ordine_articoli = []
 
 for item in st.session_state["ordine_articoli"]:
     with st.container(border=True):
-        # Usando columns responsivamente
-        cols = st.columns([4, 1])  # descrizione larga, quantità stretta
+        # Disposizione su 2 colonne: descrizione e quantità
+        col1, col2 = st.columns([4, 1])
 
-        # Colonna descrizione
-        articolo_scelto = cols[0].selectbox(
-            "Articolo",
-            [a["Descrizione"] for a in articoli],
-            index=[a["Descrizione"] for a in articoli].index(item["articolo"])
-            if item["articolo"] else 0,
-            label_visibility="collapsed",
-            key=f"art-{item['id']}"
-        )
+        with col1:
+            articolo_scelto = st.selectbox(
+                "Articolo",
+                [a["Descrizione"] for a in articoli],
+                index=[a["Descrizione"] for a in articoli].index(item["articolo"])
+                if item["articolo"] else 0,
+                label_visibility="collapsed",
+                key=f"art-{item['id']}"
+            )
 
-        # Colonna quantità
-        qty = cols[1].number_input(
-            "Qtà",
-            min_value=0,
-            step=1,
-            value=item["qty"],
-            format="%d",
-            label_visibility="collapsed",
-            key=f"qty-{item['id']}"
-        )
+        with col2:
+            qty = st.number_input(
+                "Qtà",
+                min_value=0,
+                step=1,
+                value=item["qty"],
+                format="%d",
+                label_visibility="collapsed",
+                key=f"qty-{item['id']}"
+            )
 
+        # Aggiungi all'ordine aggiornato
         nuovo_ordine_articoli.append({
             "id": item["id"],
             "articolo": articolo_scelto,
