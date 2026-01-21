@@ -18,21 +18,6 @@ email = google_login()
 credentials = get_credentials()
 
 # ===============================
-# ACCOUNT ICON IN ALTO A DESTRA
-with st.container():
-    col1, col2 = st.columns([9, 1])
-    with col2:
-        if st.button("👤"):
-            st.session_state["show_account"] = not st.session_state.get("show_account", False)
-
-if st.session_state.get("show_account", False):
-    st.info(f"Email: {email}")
-    if st.button("🚪 Logout"):
-        logout()
-
-st.divider()
-
-# ===============================
 # CACHE GOOGLE SHEETS
 @st.cache_data(ttl=300)
 def load_clienti(_credentials):
@@ -82,7 +67,7 @@ if not articoli:
 tab_ordine, tab_riepilogo = st.tabs(["🧾 Articoli Ordine", "📧 Riepilogo & Invio"])
 
 # ===============================
-# TAB 1 — INSERIMENTO ARTICOLI (FIXED HEIGHT, NO SCROLL)
+# TAB 1 — INSERIMENTO ARTICOLI
 with tab_ordine:
     st.subheader("🧾 Articoli Ordine")
 
@@ -136,7 +121,7 @@ with tab_ordine:
     )
 
 # ===============================
-# TAB 2 — RIEPILOGO & INVIO (FIXED HEIGHT, NO SCROLL)
+# TAB 2 — RIEPILOGO & INVIO
 with tab_riepilogo:
     st.subheader("📦 Riepilogo Ordine")
 
@@ -211,3 +196,16 @@ with tab_riepilogo:
         except Exception as e:
             st.error("❌ Errore durante l'invio dell'ordine")
             st.error(e)
+
+# ===============================
+# ACCOUNT ICON IN BASSO
+st.divider()
+col1, col2, col3 = st.columns([1, 8, 1])
+with col2:
+    if st.button("👤"):
+        st.session_state["show_account"] = not st.session_state.get("show_account", False)
+
+if st.session_state.get("show_account", False):
+    st.info(f"Email: {email}")
+    if st.button("🚪 Logout"):
+        logout()
