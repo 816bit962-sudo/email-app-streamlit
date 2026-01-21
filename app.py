@@ -3,7 +3,6 @@ from auth import google_login, get_credentials, logout
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import pandas as pd
-import uuid
 
 # ===============================
 # CONFIG
@@ -13,22 +12,21 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("📦 Ordini Aziendali")
-
 # ===============================
 # LOGIN
 email = google_login()
 credentials = get_credentials()
 
-# HEADER UTENTE
-col1, col2 = st.columns([1, 5])
-with col1:
-    if "picture" in st.session_state:
-        st.image(st.session_state["picture"], width=40)
-with col2:
-    st.caption(f"👤 {email}")
+# ===============================
+# ACCOUNT ICON IN ALTO A DESTRA
+with st.container():
+    col1, col2 = st.columns([9, 1])
+    with col2:
+        if st.button("👤"):
+            st.session_state["show_account"] = not st.session_state.get("show_account", False)
 
-with st.expander("⚙️ Account"):
+if st.session_state.get("show_account", False):
+    st.info(f"Email: {email}")
     if st.button("🚪 Logout"):
         logout()
 
@@ -45,32 +43,7 @@ def load_articoli(_credentials):
     return get_articoli(_credentials)
 
 # ===============================
-# CLIENTE
-st.subheader("👥 Cliente")
-
-try:
-    clienti = load_clienti(credentials)
-except Exception as e:
-    st.error("❌ Errore nel leggere i clienti")
-    st.error(e)
-    st.stop()
-
-if not clienti:
-    st.warning("⚠️ Nessun cliente trovato")
-    st.stop()
-
-cliente_scelto = st.selectbox(
-    "Seleziona cliente",
-    [c["Nome"] for c in clienti]
-)
-
-st.divider()
-
-# ===============================
-# ARTICOLI
-st.subheader("🧾 Articoli ordine")
-
-# Inizializzazione session_state
+# INIZIALIZZAZIONE SESSION STATE
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
@@ -80,6 +53,15 @@ if "articolo_temp" not in st.session_state:
 if "qty_temp" not in st.session_state:
     st.session_state["qty_temp"] = 1
 
+# ===============================
+# CARICAMENTO DATI
+try:
+    clienti = load_clienti(credentials)
+except Exception as e:
+    st.error("❌ Errore nel leggere i clienti")
+    st.error(e)
+    st.stop()
+
 try:
     articoli = load_articoli(credentials)
 except Exception as e:
@@ -87,49 +69,33 @@ except Exception as e:
     st.error(e)
     st.stop()
 
+if not clienti:
+    st.warning("⚠️ Nessun cliente trovato")
+    st.stop()
+
 if not articoli:
     st.warning("⚠️ Nessun articolo trovato")
     st.stop()
 
 # ===============================
-# FUNZIONE AGGIUNGI ARTICOLO
-def aggiungi_articolo():
-    if st.session_state["articolo_temp"] and st.session_state["qty_temp"] > 0:
-        art = next(
-            a for a in articoli
-            if a["Descrizione"] == st.session_state["articolo_temp"]
-        )
-        st.session_state["ordine_articoli"].append({
-            "IdArticolo": str(art["IdArticolo"]),
-            "Descrizione": str(art["Descrizione"]),
-            "Quantita": int(st.session_state["qty_temp"])
-        })
+# TABS PRINCIPALI
+tab_ordine, tab_riepilogo = st.tabs(["🧾 Articoli Ordine", "📧 Riepilogo & Invio"])
 
-        # Reset campi input
-        st.session_state["articolo_temp"] = None
-        st.session_state["qty_temp"] = 1
+# ===============================
+# TAB 1 — INSERIMENTO ARTICOLI (FIXED HEIGHT, NO SCROLL)
+with tab_ordine:
+    st.subheader("🧾 Articoli Ordine")
 
-# Bottone aggiungi articolo
-st.button("➕ Aggiungi articolo", use_container_width=True, on_click=aggiungi_articolo)
-
-# Campo singolo per aggiungere articolo
-with st.container(border=True):
+    # Inserimento articolo + quantità
     col1, col2 = st.columns([4, 1])
-
     with col1:
-        articolo_temp = st.selectbox(
+        st.selectbox(
             "Articolo",
             [a["Descrizione"] for a in articoli],
-            index=(
-                [a["Descrizione"] for a in articoli].index(st.session_state["articolo_temp"])
-                if st.session_state["articolo_temp"] in [a["Descrizione"] for a in articoli]
-                else 0
-            ),
             key="articolo_temp"
         )
-
     with col2:
-        qty_temp = st.number_input(
+        st.number_input(
             "Qtà",
             min_value=1,
             step=1,
@@ -137,91 +103,111 @@ with st.container(border=True):
             key="qty_temp"
         )
 
-st.divider()
+    # Funzione aggiungi articolo
+    def aggiungi_articolo():
+        if st.session_state["articolo_temp"]:
+            art = next(
+                a for a in articoli
+                if a["Descrizione"] == st.session_state["articolo_temp"]
+            )
+            st.session_state["ordine_articoli"].append({
+                "IdArticolo": str(art["IdArticolo"]),
+                "Descrizione": art["Descrizione"],
+                "Quantita": int(st.session_state["qty_temp"])
+            })
+            st.session_state["qty_temp"] = 1
+            st.session_state["articolo_temp"] = None
+
+    st.button(
+        "➕ Aggiungi articolo",
+        use_container_width=True,
+        on_click=aggiungi_articolo,
+        disabled=not st.session_state["articolo_temp"]
+    )
+
+    st.divider()
+
+    # Selezione cliente
+    st.subheader("👥 Cliente")
+    cliente_scelto = st.selectbox(
+        "Seleziona cliente",
+        [c["Nome"] for c in clienti],
+        key="cliente_scelto"
+    )
 
 # ===============================
-# RIEPILOGO ORDINE - DATA EDITOR
-ordine = st.session_state["ordine_articoli"]
+# TAB 2 — RIEPILOGO & INVIO (FIXED HEIGHT, NO SCROLL)
+with tab_riepilogo:
+    st.subheader("📦 Riepilogo Ordine")
 
-if ordine:
-    st.subheader("🧾 Riepilogo ordine")
+    ordine = st.session_state["ordine_articoli"]
 
-    # DataFrame per data_editor
+    if not ordine:
+        st.info("🛈 Nessun articolo inserito")
+        st.stop()
+
     df_ordine = pd.DataFrame(ordine)
     df_ordine["Elimina?"] = False
 
-    # Mostra solo le colonne visibili nell'editor
     edited_df = st.data_editor(
         df_ordine[["Descrizione", "Quantita", "Elimina?"]],
         use_container_width=True,
-        num_rows="dynamic",
-        key="editable_ordine"
+        num_rows="fixed"
     )
 
-    # Aggiorna il carrello con modifiche
     nuovi_articoli = []
     for idx, row in edited_df.iterrows():
         if not row["Elimina?"]:
-            original = df_ordine.iloc[idx]  # prendi IdArticolo originale
+            original = df_ordine.iloc[idx]
             nuovi_articoli.append({
-                "IdArticolo": str(original["IdArticolo"]),
-                "Descrizione": str(row["Descrizione"]),
+                "IdArticolo": original["IdArticolo"],
+                "Descrizione": row["Descrizione"],
                 "Quantita": int(row["Quantita"])
             })
 
     st.session_state["ordine_articoli"] = nuovi_articoli
 
-    st.write(f"**Totale articoli:** {sum(i['Quantita'] for i in nuovi_articoli)}")
+    st.write(
+        f"**Totale articoli:** {sum(i['Quantita'] for i in nuovi_articoli)}"
+    )
 
-st.divider()
+    st.divider()
 
-# ===============================
-# INVIO ORDINE
-if st.button(
-    "📧 Invia ordine",
-    type="primary",
-    use_container_width=True,
-    disabled=not st.session_state["ordine_articoli"]
-):
-    try:
-        with st.spinner("Invio ordine in corso..."):
-            # Converte tutto in tipi Python standard per evitare errori JSON
-            ordine_finale = [
-                {
-                    "IdArticolo": str(item["IdArticolo"]),
-                    "Descrizione": str(item["Descrizione"]),
-                    "Quantita": int(item["Quantita"])
-                }
-                for item in st.session_state["ordine_articoli"]
-            ]
+    # INVIO ORDINE
+    if st.button(
+        "📧 Invia ordine",
+        type="primary",
+        use_container_width=True,
+        disabled=not st.session_state["ordine_articoli"]
+    ):
+        try:
+            with st.spinner("Invio ordine in corso..."):
+                id_ordine = crea_ordine(
+                    credentials,
+                    email,
+                    st.session_state["cliente_scelto"],
+                    nuovi_articoli
+                )
 
-            id_ordine = crea_ordine(
-                credentials,
-                email,
-                cliente_scelto,
-                ordine_finale
-            )
+                corpo_email = (
+                    f"Ordine #{id_ordine}\n"
+                    f"Utente: {email}\n"
+                    f"Cliente: {st.session_state['cliente_scelto']}\n\n"
+                )
 
-            destinatario = "lucamantini2009@gmail.com"
-            corpo_email = (
-                f"Ordine #{id_ordine}\n"
-                f"Utente: {email}\n"
-                f"Cliente: {cliente_scelto}\n\n"
-            )
+                for item in nuovi_articoli:
+                    corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
 
-            for item in ordine_finale:
-                corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
+                send_email(
+                    credentials,
+                    "lucamantini2009@gmail.com",
+                    f"Nuovo ordine #{id_ordine}",
+                    corpo_email
+                )
 
-            send_email(
-                credentials,
-                destinatario,
-                f"Nuovo ordine #{id_ordine}",
-                corpo_email
-            )
+            st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
+            st.session_state["ordine_articoli"] = []
 
-        st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
-        st.session_state["ordine_articoli"] = []
-
-    except Exception as e:
-        st.error("❌ Errore durante l'invio dell'ordine")
-        st.error(e)
+        except Exception as e:
+            st.error("❌ Errore durante l'invio dell'ordine")
+            st.error(e)
