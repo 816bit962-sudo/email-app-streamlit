@@ -196,16 +196,3 @@ with tab_riepilogo:
         except Exception as e:
             st.error("❌ Errore durante l'invio dell'ordine")
             st.error(e)
-
-# ===============================
-# ACCOUNT ICON IN BASSO
-st.divider()
-col1, col2, col3 = st.columns([1, 8, 1])
-with col2:
-    if st.button("👤"):
-        st.session_state["show_account"] = not st.session_state.get("show_account", False)
-
-if st.session_state.get("show_account", False):
-    st.info(f"Email: {email}")
-    if st.button("🚪 Logout"):
-        logout()
