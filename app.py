@@ -139,18 +139,22 @@ with tab_riepilogo:
     edited_df = st.data_editor(
         df[["Descrizione", "Qtà"]],
         use_container_width=True,
-        num_rows="dynamic",
         hide_index=True,
         column_config={
             "Descrizione": st.column_config.TextColumn(
-                disabled=True
+                "Descrizione",
+                disabled=True,
+                width="small"   # 👈 forza colonna stretta
             ),
             "Qtà": st.column_config.NumberColumn(
+                "Qtà",
                 min_value=1,
-                step=1
+                step=1,
+                width="small"
             )
         }
     )
+
 
     # Ricostruisci ordine partendo dal risultato dell'editor
     nuovi_articoli = []
