@@ -1,5 +1,5 @@
 import streamlit as st
-from auth import google_login, get_credentials, logout
+from auth import google_login, get_credentials
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
 import pandas as pd
@@ -28,7 +28,7 @@ def load_articoli(_credentials):
     return get_articoli(_credentials)
 
 # ===============================
-# INIZIALIZZAZIONE SESSION STATE
+# SESSION STATE
 if "ordine_articoli" not in st.session_state:
     st.session_state["ordine_articoli"] = []
 
@@ -39,69 +39,67 @@ if "qty_temp" not in st.session_state:
     st.session_state["qty_temp"] = 1
 
 # ===============================
-# CARICAMENTO DATI
-try:
-    clienti = load_clienti(credentials)
-except Exception as e:
-    st.error("❌ Errore nel leggere i clienti")
-    st.error(e)
-    st.stop()
+# LOAD DATA
+clienti = load_clienti(credentials)
+articoli = load_articoli(credentials)
 
-try:
-    articoli = load_articoli(credentials)
-except Exception as e:
-    st.error("❌ Errore nel leggere gli articoli")
-    st.error(e)
-    st.stop()
-
-if not clienti:
-    st.warning("⚠️ Nessun cliente trovato")
-    st.stop()
-
-if not articoli:
-    st.warning("⚠️ Nessun articolo trovato")
+if not clienti or not articoli:
+    st.error("Dati mancanti")
     st.stop()
 
 # ===============================
-# TABS PRINCIPALI
-tab_ordine, tab_riepilogo = st.tabs(["🧾 Articoli Ordine", "📧 Riepilogo & Invio"])
+# TABS
+tab_ordine, tab_riepilogo = st.tabs(
+    ["🧾 Articoli Ordine", "📧 Riepilogo & Invio"]
+)
 
 # ===============================
-# TAB 1 — INSERIMENTO ARTICOLI
+# TAB 1 — INSERIMENTO
 with tab_ordine:
-    st.subheader("🧾 Articoli Ordine")
 
-    # Inserimento articolo + quantità
-    col1, col2 = st.columns([4, 1])
+    col1, col2 = st.columns([4, 1], gap="small")
+
+    # -------- SELEZIONA ARTICOLO --------
     with col1:
-        st.selectbox(
-            "Articolo",
-            [a["Descrizione"] for a in articoli],
-            key="articolo_temp"
+        st.markdown(
+            "<div style='font-size:0.9rem; font-weight:600;'>Seleziona articolo</div>",
+            unsafe_allow_html=True
         )
+        st.selectbox(
+            label="Seleziona articolo",
+            options=[a["Descrizione"] for a in articoli],
+            key="articolo_temp",
+            label_visibility="collapsed"
+        )
+
+    # -------- QUANTITÀ --------
     with col2:
+        st.markdown(
+            "<div style='font-size:0.9rem; font-weight:600;'>Qtà</div>",
+            unsafe_allow_html=True
+        )
         st.number_input(
-            "Qtà",
+            label="Qtà",
             min_value=1,
             step=1,
             format="%d",
-            key="qty_temp"
+            key="qty_temp",
+            label_visibility="collapsed"
         )
 
-    # Funzione aggiungi articolo
+    # -------- AGGIUNGI ARTICOLO --------
     def aggiungi_articolo():
-        if st.session_state["articolo_temp"]:
-            art = next(
-                a for a in articoli
-                if a["Descrizione"] == st.session_state["articolo_temp"]
-            )
-            st.session_state["ordine_articoli"].append({
-                "IdArticolo": str(art["IdArticolo"]),
-                "Descrizione": art["Descrizione"],
-                "Quantita": int(st.session_state["qty_temp"])
-            })
-            st.session_state["qty_temp"] = 1
-            st.session_state["articolo_temp"] = None
+        art = next(
+            a for a in articoli
+            if a["Descrizione"] == st.session_state["articolo_temp"]
+        )
+        st.session_state["ordine_articoli"].append({
+            "IdArticolo": str(art["IdArticolo"]),
+            "Descrizione": art["Descrizione"],
+            "Quantita": int(st.session_state["qty_temp"])
+        })
+        st.session_state["qty_temp"] = 1
+        st.session_state["articolo_temp"] = None
 
     st.button(
         "➕ Aggiungi articolo",
@@ -112,18 +110,21 @@ with tab_ordine:
 
     st.divider()
 
-    # Selezione cliente
-    st.subheader("👥 Cliente")
-    cliente_scelto = st.selectbox(
-        "Seleziona cliente",
-        [c["Nome"] for c in clienti],
-        key="cliente_scelto"
+    # -------- CLIENTE --------
+    st.markdown(
+        "<div style='font-size:0.9rem; font-weight:600;'>Seleziona cliente</div>",
+        unsafe_allow_html=True
+    )
+    st.selectbox(
+        label="Seleziona cliente",
+        options=[c["Nome"] for c in clienti],
+        key="cliente_scelto",
+        label_visibility="collapsed"
     )
 
 # ===============================
 # TAB 2 — RIEPILOGO & INVIO
 with tab_riepilogo:
-    st.subheader("📦 Riepilogo Ordine")
 
     ordine = st.session_state["ordine_articoli"]
 
@@ -131,11 +132,11 @@ with tab_riepilogo:
         st.info("🛈 Nessun articolo inserito")
         st.stop()
 
-    df_ordine = pd.DataFrame(ordine)
-    df_ordine["Elimina?"] = False
+    df = pd.DataFrame(ordine)
+    df["Elimina?"] = False
 
     edited_df = st.data_editor(
-        df_ordine[["Descrizione", "Quantita", "Elimina?"]],
+        df[["Descrizione", "Quantita", "Elimina?"]],
         use_container_width=True,
         num_rows="fixed"
     )
@@ -143,7 +144,7 @@ with tab_riepilogo:
     nuovi_articoli = []
     for idx, row in edited_df.iterrows():
         if not row["Elimina?"]:
-            original = df_ordine.iloc[idx]
+            original = df.iloc[idx]
             nuovi_articoli.append({
                 "IdArticolo": original["IdArticolo"],
                 "Descrizione": row["Descrizione"],
@@ -152,47 +153,44 @@ with tab_riepilogo:
 
     st.session_state["ordine_articoli"] = nuovi_articoli
 
-    st.write(
-        f"**Totale articoli:** {sum(i['Quantita'] for i in nuovi_articoli)}"
+    st.markdown(
+        f"<div style='font-size:0.95rem; font-weight:600;'>"
+        f"Totale articoli: {sum(i['Quantita'] for i in nuovi_articoli)}"
+        f"</div>",
+        unsafe_allow_html=True
     )
 
     st.divider()
 
-    # INVIO ORDINE
     if st.button(
         "📧 Invia ordine",
         type="primary",
         use_container_width=True,
-        disabled=not st.session_state["ordine_articoli"]
+        disabled=not nuovi_articoli
     ):
-        try:
-            with st.spinner("Invio ordine in corso..."):
-                id_ordine = crea_ordine(
-                    credentials,
-                    email,
-                    st.session_state["cliente_scelto"],
-                    nuovi_articoli
-                )
+        with st.spinner("Invio ordine in corso..."):
+            id_ordine = crea_ordine(
+                credentials,
+                email,
+                st.session_state["cliente_scelto"],
+                nuovi_articoli
+            )
 
-                corpo_email = (
-                    f"Ordine #{id_ordine}\n"
-                    f"Utente: {email}\n"
-                    f"Cliente: {st.session_state['cliente_scelto']}\n\n"
-                )
+            corpo = (
+                f"Ordine #{id_ordine}\n"
+                f"Utente: {email}\n"
+                f"Cliente: {st.session_state['cliente_scelto']}\n\n"
+            )
 
-                for item in nuovi_articoli:
-                    corpo_email += f"{item['Descrizione']} x {item['Quantita']}\n"
+            for item in nuovi_articoli:
+                corpo += f"{item['Descrizione']} x {item['Quantita']}\n"
 
-                send_email(
-                    credentials,
-                    "lucamantini2009@gmail.com",
-                    f"Nuovo ordine #{id_ordine}",
-                    corpo_email
-                )
+            send_email(
+                credentials,
+                "lucamantini2009@gmail.com",
+                f"Nuovo ordine #{id_ordine}",
+                corpo
+            )
 
-            st.success(f"✅ Ordine #{id_ordine} inviato con successo!")
-            st.session_state["ordine_articoli"] = []
-
-        except Exception as e:
-            st.error("❌ Errore durante l'invio dell'ordine")
-            st.error(e)
+        st.success(f"✅ Ordine #{id_ordine} inviato!")
+        st.session_state["ordine_articoli"] = []
