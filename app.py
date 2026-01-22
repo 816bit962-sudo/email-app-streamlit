@@ -96,7 +96,7 @@ with tab_ordine:
         st.session_state["ordine_articoli"].append({
             "IdArticolo": str(art["IdArticolo"]),
             "Descrizione": art["Descrizione"],
-            "Quantita": int(st.session_state["qty_temp"])
+            "Qtà": int(st.session_state["qty_temp"])
         })
         st.session_state["qty_temp"] = 1
         st.session_state["articolo_temp"] = None
@@ -137,7 +137,7 @@ with tab_riepilogo:
 
     # Editor dinamico → checkbox + cestino NATIVI
     edited_df = st.data_editor(
-        df[["Descrizione", "Quantita"]],
+        df[["Descrizione", "Qtà"]],
         use_container_width=True,
         num_rows="dynamic",
         hide_index=True,
@@ -145,7 +145,7 @@ with tab_riepilogo:
             "Descrizione": st.column_config.TextColumn(
                 disabled=True
             ),
-            "Quantita": st.column_config.NumberColumn(
+            "Qtà": st.column_config.NumberColumn(
                 min_value=1,
                 step=1
             )
@@ -162,14 +162,14 @@ with tab_riepilogo:
         nuovi_articoli.append({
             "IdArticolo": art["IdArticolo"],
             "Descrizione": row["Descrizione"],
-            "Quantita": int(row["Quantita"])
+            "Qtà": int(row["Qtà"])
         })
 
     st.session_state["ordine_articoli"] = nuovi_articoli
 
     st.markdown(
         f"<div style='font-size:0.95rem; font-weight:600;'>"
-        f"Totale articoli: {sum(i['Quantita'] for i in nuovi_articoli)}"
+        f"Totale articoli: {sum(i['Qtà'] for i in nuovi_articoli)}"
         f"</div>",
         unsafe_allow_html=True
     )
@@ -197,7 +197,7 @@ with tab_riepilogo:
             )
 
             for item in nuovi_articoli:
-                corpo += f"{item['Descrizione']} x {item['Quantita']}\n"
+                corpo += f"{item['Descrizione']} x {item['Qtà']}\n"
 
             send_email(
                 credentials,
