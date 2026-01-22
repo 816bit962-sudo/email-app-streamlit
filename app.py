@@ -132,24 +132,38 @@ with tab_riepilogo:
         st.info("🛈 Nessun articolo inserito")
         st.stop()
 
+    # DataFrame base
     df = pd.DataFrame(ordine)
-    df["Elimina?"] = False
 
+    # Editor dinamico → checkbox + cestino NATIVI
     edited_df = st.data_editor(
-        df[["Descrizione", "Quantita", "Elimina?"]],
+        df[["Descrizione", "Quantita"]],
         use_container_width=True,
-        num_rows="fixed"
+        num_rows="dynamic",
+        hide_index=True,
+        column_config={
+            "Descrizione": st.column_config.TextColumn(
+                disabled=True
+            ),
+            "Quantita": st.column_config.NumberColumn(
+                min_value=1,
+                step=1
+            )
+        }
     )
 
+    # Ricostruisci ordine partendo dal risultato dell'editor
     nuovi_articoli = []
-    for idx, row in edited_df.iterrows():
-        if not row["Elimina?"]:
-            original = df.iloc[idx]
-            nuovi_articoli.append({
-                "IdArticolo": original["IdArticolo"],
-                "Descrizione": row["Descrizione"],
-                "Quantita": int(row["Quantita"])
-            })
+    for _, row in edited_df.iterrows():
+        art = next(
+            a for a in ordine
+            if a["Descrizione"] == row["Descrizione"]
+        )
+        nuovi_articoli.append({
+            "IdArticolo": art["IdArticolo"],
+            "Descrizione": row["Descrizione"],
+            "Quantita": int(row["Quantita"])
+        })
 
     st.session_state["ordine_articoli"] = nuovi_articoli
 
@@ -194,3 +208,5 @@ with tab_riepilogo:
 
         st.success(f"✅ Ordine #{id_ordine} inviato!")
         st.session_state["ordine_articoli"] = []
+        st.rerun()
+
