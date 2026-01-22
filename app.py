@@ -144,7 +144,7 @@ with tab_riepilogo:
             "Descrizione": st.column_config.TextColumn(
                 "Descrizione",
                 disabled=True,
-                width="medium"
+                width="large"
             ),
             "Qtà": st.column_config.NumberColumn(
                 "Qtà",
