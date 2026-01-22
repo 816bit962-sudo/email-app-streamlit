@@ -1,8 +1,8 @@
 import streamlit as st
+import pandas as pd
 from auth import google_login, get_credentials
 from gmail import send_email
 from sheets import get_clienti, get_articoli, crea_ordine
-import pandas as pd
 
 # ===============================
 # CONFIG
@@ -18,7 +18,7 @@ email = google_login()
 credentials = get_credentials()
 
 # ===============================
-# CACHE GOOGLE SHEETS
+# CACHE
 @st.cache_data(ttl=300)
 def load_clienti(_credentials):
     return get_clienti(_credentials)
@@ -37,6 +37,9 @@ if "articolo_temp" not in st.session_state:
 
 if "qty_temp" not in st.session_state:
     st.session_state["qty_temp"] = 1
+
+if "note" not in st.session_state:
+    st.session_state["note"] = ""
 
 # ===============================
 # LOAD DATA
@@ -59,40 +62,27 @@ with tab_ordine:
 
     col1, col2 = st.columns([4, 1], gap="small")
 
-    # -------- SELEZIONA ARTICOLO --------
     with col1:
-        st.markdown(
-            "<div style='font-size:0.9rem; font-weight:600;'>Seleziona articolo</div>",
-            unsafe_allow_html=True
-        )
+        st.markdown("<b>Seleziona articolo</b>", unsafe_allow_html=True)
         st.selectbox(
-            label="Seleziona articolo",
+            "Articolo",
             options=[a["Descrizione"] for a in articoli],
             key="articolo_temp",
             label_visibility="collapsed"
         )
 
-    # -------- QUANTITÀ --------
     with col2:
-        st.markdown(
-            "<div style='font-size:0.9rem; font-weight:600;'>Qtà</div>",
-            unsafe_allow_html=True
-        )
+        st.markdown("<b>Qtà</b>", unsafe_allow_html=True)
         st.number_input(
-            label="Qtà",
+            "Qtà",
             min_value=1,
             step=1,
-            format="%d",
             key="qty_temp",
             label_visibility="collapsed"
         )
 
-    # -------- AGGIUNGI ARTICOLO --------
     def aggiungi_articolo():
-        art = next(
-            a for a in articoli
-            if a["Descrizione"] == st.session_state["articolo_temp"]
-        )
+        art = next(a for a in articoli if a["Descrizione"] == st.session_state["articolo_temp"])
         st.session_state["ordine_articoli"].append({
             "IdArticolo": str(art["IdArticolo"]),
             "Descrizione": art["Descrizione"],
@@ -110,20 +100,16 @@ with tab_ordine:
 
     st.divider()
 
-    # -------- CLIENTE --------
-    st.markdown(
-        "<div style='font-size:0.9rem; font-weight:600;'>Seleziona cliente</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown("<b>Seleziona cliente</b>", unsafe_allow_html=True)
     st.selectbox(
-        label="Seleziona cliente",
+        "Cliente",
         options=[c["Nome"] for c in clienti],
         key="cliente_scelto",
         label_visibility="collapsed"
     )
 
 # ===============================
-# TAB 2 — RIEPILOGO & INVIO
+# TAB 2 — RIEPILOGO
 with tab_riepilogo:
 
     ordine = st.session_state["ordine_articoli"]
@@ -132,36 +118,21 @@ with tab_riepilogo:
         st.info("🛈 Nessun articolo inserito")
         st.stop()
 
-    # DataFrame base
     df = pd.DataFrame(ordine)
 
-    # Editor dinamico → checkbox + cestino NATIVI
     edited_df = st.data_editor(
         df[["Descrizione", "Qtà"]],
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Descrizione": st.column_config.TextColumn(
-                "Descrizione",
-                disabled=True,
-                width="medium"
-            ),
-            "Qtà": st.column_config.NumberColumn(
-                "Qtà",
-                min_value=1,
-                step=1
-            )
+            "Descrizione": st.column_config.TextColumn("Descrizione", disabled=True),
+            "Qtà": st.column_config.NumberColumn("Qtà", min_value=1, step=1)
         }
     )
 
-
-    # Ricostruisci ordine partendo dal risultato dell'editor
     nuovi_articoli = []
     for _, row in edited_df.iterrows():
-        art = next(
-            a for a in ordine
-            if a["Descrizione"] == row["Descrizione"]
-        )
+        art = next(a for a in ordine if a["Descrizione"] == row["Descrizione"])
         nuovi_articoli.append({
             "IdArticolo": art["IdArticolo"],
             "Descrizione": row["Descrizione"],
@@ -170,11 +141,16 @@ with tab_riepilogo:
 
     st.session_state["ordine_articoli"] = nuovi_articoli
 
-    st.markdown(
-        f"<div style='font-size:0.95rem; font-weight:600;'>"
-        f"Totale articoli: {sum(i['Qtà'] for i in nuovi_articoli)}"
-        f"</div>",
-        unsafe_allow_html=True
+    st.divider()
+
+    # 📝 NOTE
+    st.markdown("<b>Note</b>", unsafe_allow_html=True)
+    st.text_area(
+        "Note ordine",
+        placeholder="Inserisci eventuali note per l’ordine...",
+        key="note",
+        height=100,
+        label_visibility="collapsed"
     )
 
     st.divider()
@@ -190,13 +166,15 @@ with tab_riepilogo:
                 credentials,
                 email,
                 st.session_state["cliente_scelto"],
-                nuovi_articoli
+                nuovi_articoli,
+                st.session_state["note"]
             )
 
             corpo = (
                 f"Ordine #{id_ordine}\n"
                 f"Utente: {email}\n"
                 f"Cliente: {st.session_state['cliente_scelto']}\n\n"
+                f"NOTE:\n{st.session_state['note']}\n\n"
             )
 
             for item in nuovi_articoli:
@@ -211,5 +189,9 @@ with tab_riepilogo:
 
         st.success(f"✅ Ordine #{id_ordine} inviato!")
         st.session_state["ordine_articoli"] = []
+
+        if "note" in st.session_state:
+            del st.session_state["note"]
+
         st.rerun()
 
