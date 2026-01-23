@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
-
 from auth import google_login, get_credentials
 from gmail import send_email
-from sheets import get_clienti, get_articoli, crea_ordine, get_destinatari
+from sheets import (
+    get_clienti,
+    get_articoli,
+    crea_ordine,
+    get_destinatari,
+    aggiungi_destinatario
+)
+import streamlit.components.v1 as components
 
 # ===============================
 # CONFIG
@@ -45,6 +51,9 @@ if "qty_temp" not in st.session_state:
 
 if "note" not in st.session_state:
     st.session_state["note"] = ""
+
+if "destinatario" not in st.session_state:
+    st.session_state["destinatario"] = ""
 
 # ===============================
 # LOAD DATA
@@ -103,7 +112,6 @@ with tab_ordine:
     )
 
     st.divider()
-
     st.markdown("<b>Seleziona cliente</b>", unsafe_allow_html=True)
     st.selectbox(
         "Cliente",
@@ -143,21 +151,32 @@ with tab_riepilogo:
     st.divider()
 
     # ===============================
-    # DESTINATARIO (solo tendina)
+    # DESTINATARIO — HTML + autocomplete moderno
     st.markdown("<b>Destinatario email</b>", unsafe_allow_html=True)
+    options_html = "".join(f"<option value='{o}'></option>" for o in destinatari)
 
-    st.selectbox(
-        "Destinatario",
-        options=destinatari,
-        key="destinatario_scelto",
-        label_visibility="collapsed"
-    )
+    html_code = f"""
+    <input list="dest_list" id="dest_input" placeholder="Scrivi o seleziona un indirizzo email"
+        style="width:100%; padding:8px; font-size:14px; margin-top:4px; border-radius:6px; border:1px solid #ccc;"
+        onchange="document.dispatchEvent(new CustomEvent('updateDestinatario', {{detail:this.value}}))">
+    <datalist id="dest_list">{options_html}</datalist>
+    """
+
+    components.html(html_code, height=60)
+
+    # ===============================
+    # usa st.query_params moderno
+    if "destinatario" not in st.session_state:
+        st.session_state["destinatario"] = ""
+
+    query_params = st.query_params
+    destinatario = query_params.get("destinatario", [""])[0]
+    st.session_state["destinatario"] = destinatario
 
     st.divider()
     st.markdown("<b>Note</b>", unsafe_allow_html=True)
     st.text_area(
         "Note ordine",
-        placeholder="Inserisci eventuali note per l’ordine...",
         key="note",
         height=100,
         label_visibility="collapsed"
@@ -168,27 +187,34 @@ with tab_riepilogo:
     # ===============================
     # INVIO ORDINE
     if st.button("📧 Invia ordine", type="primary", use_container_width=True):
-        with st.spinner("Invio ordine in corso..."):
+        destinatario = st.session_state.get("destinatario", "").strip()
+        if not destinatario:
+            st.error("Inserisci un destinatario email")
+            st.stop()
 
-            destinatario = st.session_state["destinatario_scelto"]
+        # salva se nuovo
+        if destinatario not in destinatari:
+            aggiungi_destinatario(credentials, destinatario)
+            st.cache_data.clear()
 
-            id_ordine = crea_ordine(
-                credentials,
-                email,
-                st.session_state["cliente_scelto"],
-                nuovi_articoli,
-                st.session_state["note"]
-            )
+        # crea ordine e invia email
+        id_ordine = crea_ordine(
+            credentials,
+            email,
+            st.session_state["cliente_scelto"],
+            nuovi_articoli,
+            st.session_state.get("note", "")
+        )
 
-            subject = f"Ordine #{id_ordine}"
+        subject = f"Ordine #{id_ordine}"
 
-            send_email(
-                credentials,
-                destinatario,
-                subject,
-                "<b>Ordine inviato</b>",
-                html=True
-            )
+        send_email(
+            credentials,
+            destinatario,
+            subject,
+            "<b>Ordine inviato</b>",
+            html=True
+        )
 
         st.success(f"✅ Ordine #{id_ordine} inviato!")
         st.session_state.clear()
