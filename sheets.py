@@ -3,50 +3,18 @@ from datetime import datetime
 
 SHEET_KEY = "1YHWrkehjx5qAuAWuNbNJye8zUO0vgjFahzPQS-FxaiM"
 
-
-# ===============================
-# CLIENTI
 def get_clienti(credentials):
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SHEET_KEY)
     ws = sh.worksheet("clienti")
     return ws.get_all_records()
 
-
-# ===============================
-# ARTICOLI
 def get_articoli(credentials):
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SHEET_KEY)
     ws = sh.worksheet("articoli")
     return ws.get_all_records()
 
-
-# ===============================
-# DESTINATARI
-def get_destinatari(credentials):
-    gc = gspread.authorize(credentials)
-    sh = gc.open_by_key(SHEET_KEY)
-    ws = sh.worksheet("destinatari")
-    records = ws.get_all_records()
-    return [r["Destinatario"] for r in records if r.get("Destinatario")]
-
-
-def aggiungi_destinatario(credentials, email):
-    gc = gspread.authorize(credentials)
-    sh = gc.open_by_key(SHEET_KEY)
-    ws = sh.worksheet("destinatari")
-
-    destinatari_esistenti = [
-        r["Destinatario"] for r in ws.get_all_records()
-    ]
-
-    if email not in destinatari_esistenti:
-        ws.append_row([email])
-
-
-# ===============================
-# CREA ORDINE
 def crea_ordine(credentials, dipendente_email, cliente_nome, articoli_ordine, note=""):
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SHEET_KEY)
