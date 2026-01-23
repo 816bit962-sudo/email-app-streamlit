@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+
 from auth import google_login, get_credentials
 from gmail import send_email
-from sheets import get_clienti, get_articoli, crea_ordine
+from sheets import get_clienti, get_articoli, crea_ordine, get_destinatari
 
 # ===============================
 # CONFIG
@@ -27,6 +28,10 @@ def load_clienti(_credentials):
 def load_articoli(_credentials):
     return get_articoli(_credentials)
 
+@st.cache_data(ttl=300)
+def load_destinatari(_credentials):
+    return get_destinatari(_credentials)
+
 # ===============================
 # SESSION STATE
 if "ordine_articoli" not in st.session_state:
@@ -45,6 +50,7 @@ if "note" not in st.session_state:
 # LOAD DATA
 clienti = load_clienti(credentials)
 articoli = load_articoli(credentials)
+destinatari = load_destinatari(credentials)
 
 if not clienti or not articoli:
     st.error("Dati mancanti")
@@ -52,14 +58,11 @@ if not clienti or not articoli:
 
 # ===============================
 # TABS
-tab_ordine, tab_riepilogo = st.tabs(
-    ["🧾 Articoli Ordine", "📧 Riepilogo & Invio"]
-)
+tab_ordine, tab_riepilogo = st.tabs(["🧾 Articoli Ordine", "📧 Riepilogo & Invio"])
 
 # ===============================
 # TAB 1 — INSERIMENTO
 with tab_ordine:
-
     col1, col2 = st.columns([4, 1], gap="small")
 
     with col1:
@@ -85,6 +88,7 @@ with tab_ordine:
         art = next(a for a in articoli if a["Descrizione"] == st.session_state["articolo_temp"])
         st.session_state["ordine_articoli"].append({
             "IdArticolo": str(art["IdArticolo"]),
+            "Codice": art["Codice"],
             "Descrizione": art["Descrizione"],
             "Qtà": int(st.session_state["qty_temp"])
         })
@@ -111,7 +115,6 @@ with tab_ordine:
 # ===============================
 # TAB 2 — RIEPILOGO
 with tab_riepilogo:
-
     ordine = st.session_state["ordine_articoli"]
 
     if not ordine:
@@ -123,11 +126,7 @@ with tab_riepilogo:
     edited_df = st.data_editor(
         df[["Descrizione", "Qtà"]],
         use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Descrizione": st.column_config.TextColumn("Descrizione", disabled=True),
-            "Qtà": st.column_config.NumberColumn("Qtà", min_value=1, step=1)
-        }
+        hide_index=True
     )
 
     nuovi_articoli = []
@@ -135,15 +134,26 @@ with tab_riepilogo:
         art = next(a for a in ordine if a["Descrizione"] == row["Descrizione"])
         nuovi_articoli.append({
             "IdArticolo": art["IdArticolo"],
+            "Codice": art["Codice"],
             "Descrizione": row["Descrizione"],
             "Qtà": int(row["Qtà"])
         })
 
     st.session_state["ordine_articoli"] = nuovi_articoli
-
     st.divider()
 
-    # 📝 NOTE
+    # ===============================
+    # DESTINATARIO (solo tendina)
+    st.markdown("<b>Destinatario email</b>", unsafe_allow_html=True)
+
+    st.selectbox(
+        "Destinatario",
+        options=destinatari,
+        key="destinatario_scelto",
+        label_visibility="collapsed"
+    )
+
+    st.divider()
     st.markdown("<b>Note</b>", unsafe_allow_html=True)
     st.text_area(
         "Note ordine",
@@ -155,13 +165,13 @@ with tab_riepilogo:
 
     st.divider()
 
-    if st.button(
-        "📧 Invia ordine",
-        type="primary",
-        use_container_width=True,
-        disabled=not nuovi_articoli
-    ):
+    # ===============================
+    # INVIO ORDINE
+    if st.button("📧 Invia ordine", type="primary", use_container_width=True):
         with st.spinner("Invio ordine in corso..."):
+
+            destinatario = st.session_state["destinatario_scelto"]
+
             id_ordine = crea_ordine(
                 credentials,
                 email,
@@ -170,28 +180,16 @@ with tab_riepilogo:
                 st.session_state["note"]
             )
 
-            corpo = (
-                f"Ordine #{id_ordine}\n"
-                f"Utente: {email}\n"
-                f"Cliente: {st.session_state['cliente_scelto']}\n\n"
-                f"NOTE:\n{st.session_state['note']}\n\n"
-            )
-
-            for item in nuovi_articoli:
-                corpo += f"{item['Descrizione']} x {item['Qtà']}\n"
+            subject = f"Ordine #{id_ordine}"
 
             send_email(
                 credentials,
-                "lucamantini2009@gmail.com",
-                f"Nuovo ordine #{id_ordine}",
-                corpo
+                destinatario,
+                subject,
+                "<b>Ordine inviato</b>",
+                html=True
             )
 
         st.success(f"✅ Ordine #{id_ordine} inviato!")
-        st.session_state["ordine_articoli"] = []
-
-        if "note" in st.session_state:
-            del st.session_state["note"]
-
+        st.session_state.clear()
         st.rerun()
-
