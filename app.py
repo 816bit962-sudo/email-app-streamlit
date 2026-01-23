@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+
 from auth import google_login, get_credentials
 from gmail import send_email
 from sheets import (
@@ -9,7 +10,6 @@ from sheets import (
     get_destinatari,
     aggiungi_destinatario
 )
-import streamlit.components.v1 as components
 
 # ===============================
 # CONFIG
@@ -52,8 +52,8 @@ if "qty_temp" not in st.session_state:
 if "note" not in st.session_state:
     st.session_state["note"] = ""
 
-if "destinatario" not in st.session_state:
-    st.session_state["destinatario"] = ""
+if "destinatario_nuovo" not in st.session_state:
+    st.session_state["destinatario_nuovo"] = ""
 
 # ===============================
 # LOAD DATA
@@ -67,11 +67,14 @@ if not clienti or not articoli:
 
 # ===============================
 # TABS
-tab_ordine, tab_riepilogo = st.tabs(["🧾 Articoli Ordine", "📧 Riepilogo & Invio"])
+tab_ordine, tab_riepilogo = st.tabs(
+    ["🧾 Articoli Ordine", "📧 Riepilogo & Invio"]
+)
 
 # ===============================
 # TAB 1 — INSERIMENTO
 with tab_ordine:
+
     col1, col2 = st.columns([4, 1], gap="small")
 
     with col1:
@@ -112,6 +115,7 @@ with tab_ordine:
     )
 
     st.divider()
+
     st.markdown("<b>Seleziona cliente</b>", unsafe_allow_html=True)
     st.selectbox(
         "Cliente",
@@ -123,6 +127,7 @@ with tab_ordine:
 # ===============================
 # TAB 2 — RIEPILOGO
 with tab_riepilogo:
+
     ordine = st.session_state["ordine_articoli"]
 
     if not ordine:
@@ -148,35 +153,34 @@ with tab_riepilogo:
         })
 
     st.session_state["ordine_articoli"] = nuovi_articoli
+
     st.divider()
 
     # ===============================
-    # DESTINATARIO — HTML + autocomplete moderno
+    # DESTINATARIO
     st.markdown("<b>Destinatario email</b>", unsafe_allow_html=True)
-    options_html = "".join(f"<option value='{o}'></option>" for o in destinatari)
 
-    html_code = f"""
-    <input list="dest_list" id="dest_input" placeholder="Scrivi o seleziona un indirizzo email"
-        style="width:100%; padding:8px; font-size:14px; margin-top:4px; border-radius:6px; border:1px solid #ccc;"
-        onchange="document.dispatchEvent(new CustomEvent('updateDestinatario', {{detail:this.value}}))">
-    <datalist id="dest_list">{options_html}</datalist>
-    """
+    st.selectbox(
+        "Destinatario",
+        options=destinatari,
+        key="destinatario_scelto",
+        label_visibility="collapsed"
+    )
 
-    components.html(html_code, height=60)
-
-    # ===============================
-    # usa st.query_params moderno
-    if "destinatario" not in st.session_state:
-        st.session_state["destinatario"] = ""
-
-    query_params = st.query_params
-    destinatario = query_params.get("destinatario", [""])[0]
-    st.session_state["destinatario"] = destinatario
+    st.text_input(
+        "Nuovo destinatario",
+        placeholder="es. acquisti@azienda.it",
+        key="destinatario_nuovo",
+        label_visibility="collapsed"
+    )
 
     st.divider()
+
+    # NOTE
     st.markdown("<b>Note</b>", unsafe_allow_html=True)
     st.text_area(
         "Note ordine",
+        placeholder="Inserisci eventuali note...",
         key="note",
         height=100,
         label_visibility="collapsed"
@@ -185,36 +189,34 @@ with tab_riepilogo:
     st.divider()
 
     # ===============================
-    # INVIO ORDINE
+    # INVIO
     if st.button("📧 Invia ordine", type="primary", use_container_width=True):
-        destinatario = st.session_state.get("destinatario", "").strip()
-        if not destinatario:
-            st.error("Inserisci un destinatario email")
-            st.stop()
+        with st.spinner("Invio ordine in corso..."):
 
-        # salva se nuovo
-        if destinatario not in destinatari:
-            aggiungi_destinatario(credentials, destinatario)
-            st.cache_data.clear()
+            destinatario = st.session_state["destinatario_scelto"]
 
-        # crea ordine e invia email
-        id_ordine = crea_ordine(
-            credentials,
-            email,
-            st.session_state["cliente_scelto"],
-            nuovi_articoli,
-            st.session_state.get("note", "")
-        )
+            if st.session_state["destinatario_nuovo"].strip():
+                destinatario = st.session_state["destinatario_nuovo"].strip()
+                aggiungi_destinatario(credentials, destinatario)
+                st.cache_data.clear()
 
-        subject = f"Ordine #{id_ordine}"
+            id_ordine = crea_ordine(
+                credentials,
+                email,
+                st.session_state["cliente_scelto"],
+                nuovi_articoli,
+                st.session_state["note"]
+            )
 
-        send_email(
-            credentials,
-            destinatario,
-            subject,
-            "<b>Ordine inviato</b>",
-            html=True
-        )
+            subject = f"Ordine #{id_ordine}"
+
+            send_email(
+                credentials,
+                destinatario,
+                subject,
+                "<b>Ordine inviato</b>",
+                html=True
+            )
 
         st.success(f"✅ Ordine #{id_ordine} inviato!")
         st.session_state.clear()
