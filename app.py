@@ -76,7 +76,7 @@ tab_ordine, tab_riepilogo, tab_storico = st.tabs(
 # TAB 1 — INSERIMENTO ORDINE
 # ======================================================
 with tab_ordine:
-    # Bottone per aprire/chiudere scanner barcode
+    # Bottone per aprire/chiudere scanner (opzionale, mantiene lo stato)
     if "mostra_scanner" not in st.session_state:
         st.session_state["mostra_scanner"] = False
     
@@ -84,7 +84,7 @@ with tab_ordine:
         st.session_state["mostra_scanner"] = not st.session_state["mostra_scanner"]
     
     st.button(
-        "📷 Scansiona Barcode" if not st.session_state["mostra_scanner"] else "❌ Chiudi Scanner",
+        "📷 Inserimento Articolo" if not st.session_state["mostra_scanner"] else "❌ Chiudi Inserimento",
         use_container_width=True,
         on_click=toggle_scanner,
         type="secondary"
@@ -93,65 +93,33 @@ with tab_ordine:
     # Sezione scanner (visibile solo se attivata)
     if st.session_state["mostra_scanner"]:
         st.markdown("---")
-        barcode_img = st.camera_input(
-            "Inquadra il codice a barre",
-            key="barcode_camera"
+        
+        st.markdown("<b>Inserisci o scansiona codice articolo</b>", unsafe_allow_html=True)
+        codice_barcode = st.text_input(
+            "Codice articolo",
+            placeholder="Scansiona il codice con lo scanner Bluetooth",
+            key="barcode_input"
         )
 
-        if barcode_img is not None:
-            try:
-                import cv2
-                import numpy as np
-                from pyzbar.pyzbar import decode
-                from PIL import Image
-                import io
-
-                # Leggi immagine da Streamlit e converti in OpenCV
-                pil_image = Image.open(io.BytesIO(barcode_img.getvalue()))
-                cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-
-                # Converti in grayscale
-                gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-
-                # Applica filtro per aumentare contrasto
-                gray = cv2.equalizeHist(gray)
-
-                # Decodifica barcode
-                decoded_objects = decode(gray)
-
-                if decoded_objects:
-                    found = False
-                    for obj in decoded_objects:
-                        barcode_data = obj.data.decode('utf-8').strip()
-                        
-                        # Cerca articolo corrispondente
-                        articolo_trovato = next(
-                            (a for a in articoli if a.get("Codice", "").strip() == barcode_data),
-                            None
-                        )
-
-                        if articolo_trovato:
-                            st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                            st.session_state["mostra_scanner"] = False
-                            st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                            st.rerun()
-                            found = True
-                            break  # esci dopo il primo articolo trovato
-
-                    if not found:
-                        all_codes = ", ".join([obj.data.decode('utf-8').strip() for obj in decoded_objects])
-                        st.warning(f"⚠️ Barcode rilevati: {all_codes} – nessun articolo corrispondente")
-                else:
-                    st.warning("⚠️ Nessun barcode rilevato")
-
-            except ImportError:
-                st.error("📦 Libreria pyzbar o OpenCV non installata. Usa: pip install pyzbar opencv-python pillow")
-            except Exception as e:
-                st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
+        if codice_barcode:
+            codice_barcode = codice_barcode.strip()
+            
+            # Cerca articolo corrispondente
+            articolo_trovato = next(
+                (a for a in articoli if a.get("Codice", "").strip() == codice_barcode),
+                None
+            )
+            
+            if articolo_trovato:
+                st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                # Pulisce il campo per la prossima scansione
+                st.session_state["barcode_input"] = ""
+                st.rerun()
+            else:
+                st.error(f"❌ Nessun articolo trovato per il codice: {codice_barcode}")
 
         st.markdown("---")
-
-
     
     # Selezione manuale
     st.markdown("<b>Seleziona articolo</b>", unsafe_allow_html=True)
@@ -206,6 +174,7 @@ with tab_ordine:
         key="cliente_scelto",
         label_visibility="collapsed"
     )
+
 
 # ======================================================
 # TAB 2 — RIEPILOGO & INVIO
