@@ -135,13 +135,20 @@ with tab_riepilogo:
     if not ordine:
         st.info("🛈 Nessun articolo inserito. Vai alla tab 'Articoli Ordine' per aggiungere articoli.")
     else:
+        # Aggiungi colonna checkbox per selezione
         df = pd.DataFrame(ordine)
+        df.insert(0, "Seleziona", False)
         
         edited_df = st.data_editor(
-            df[["Descrizione", "Qtà"]],
+            df[["Seleziona", "Descrizione", "Qtà"]],
             use_container_width=True,
             hide_index=True,
             column_config={
+                "Seleziona": st.column_config.CheckboxColumn(
+                    "Elimina",
+                    help="Seleziona per eliminare l'articolo",
+                    default=False
+                ),
                 "Descrizione": st.column_config.TextColumn(
                     "Descrizione",
                     disabled=True
@@ -154,17 +161,24 @@ with tab_riepilogo:
             }
         )
         
+        # Aggiorna quantità e rimuovi articoli selezionati
         nuovi_articoli = []
-        for _, row in edited_df.iterrows():
-            art = next(a for a in ordine if a["Descrizione"] == row["Descrizione"])
-            nuovi_articoli.append({
-                "IdArticolo": art["IdArticolo"],
-                "Codice": art["Codice"],
-                "Descrizione": row["Descrizione"],
-                "Qtà": int(row["Qtà"])
-            })
+        for i, row in edited_df.iterrows():
+            if not row["Seleziona"]:  # Mantieni solo articoli NON selezionati
+                art = ordine[i]
+                nuovi_articoli.append({
+                    "IdArticolo": art["IdArticolo"],
+                    "Codice": art["Codice"],
+                    "Descrizione": art["Descrizione"],
+                    "Qtà": int(row["Qtà"])
+                })
         
         st.session_state["ordine_articoli"] = nuovi_articoli
+        
+        # Mostra avviso se ci sono articoli selezionati per l'eliminazione
+        articoli_da_eliminare = edited_df["Seleziona"].sum()
+        if articoli_da_eliminare > 0:
+            st.warning(f"⚠️ {articoli_da_eliminare} articolo/i verrà/anno eliminato/i al prossimo aggiornamento")
         
         st.divider()
         
