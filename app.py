@@ -146,13 +146,12 @@ with tab_riepilogo:
                 "Descrizione": st.column_config.TextColumn(
                     "Descrizione",
                     disabled=True,
-                    width="large"
+                    width="medium"
                 ),
                 "Qtà": st.column_config.NumberColumn(
                     "Qtà",
                     min_value=1,
-                    step=1,
-                    width="small"
+                    step=1
                 )
             },
             key="editor_riepilogo"
