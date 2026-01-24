@@ -108,15 +108,35 @@ with tab_ordine:
                 # Leggi l'immagine
                 image = Image.open(io.BytesIO(barcode_img.getvalue()))
                 
+                # Mostra l'immagine per debug
+                st.image(image, caption="Immagine catturata", use_container_width=True)
+                
                 # Converti in scala di grigi per migliore rilevamento
-                image = image.convert('L')
+                image_gray = image.convert('L')
                 
-                # Decodifica barcode con più tentativi
+                # Decodifica barcode
                 decoded_objects = decode(image)
+                decoded_objects_gray = decode(image_gray)
                 
-                if decoded_objects:
-                    barcode_data = decoded_objects[0].data.decode('utf-8')
-                    st.info(f"🔍 Codice rilevato: {barcode_data}")
+                # Combina risultati
+                all_decoded = decoded_objects + decoded_objects_gray
+                
+                st.write(f"🔍 Tentativi di rilevamento: {len(all_decoded)}")
+                
+                if all_decoded:
+                    # Mostra tutti i barcode rilevati
+                    for obj in all_decoded:
+                        barcode_data = obj.data.decode('utf-8')
+                        barcode_type = obj.type
+                        st.info(f"📊 Tipo: {barcode_type} | Codice: {barcode_data}")
+                    
+                    # Usa il primo barcode rilevato
+                    barcode_data = all_decoded[0].data.decode('utf-8')
+                    
+                    # Mostra tutti i codici disponibili per confronto
+                    st.write("📋 Codici nel database:")
+                    codici_disponibili = [a.get("Codice", "N/A") for a in articoli[:10]]
+                    st.write(codici_disponibili)
                     
                     # Cerca articolo con questo codice barcode
                     articolo_trovato = next(
@@ -131,15 +151,17 @@ with tab_ordine:
                         st.rerun()
                     else:
                         st.error(f"❌ Nessun articolo trovato per il codice: {barcode_data}")
-                        st.info("💡 Verifica che il codice corrisponda a quello nel foglio Articoli")
+                        st.info("💡 Il codice è stato letto ma non corrisponde a nessun articolo nel database")
                 else:
                     st.warning("⚠️ Nessun barcode rilevato nell'immagine")
-                    st.info("💡 Suggerimenti: \n- Inquadra meglio il barcode \n- Assicurati che ci sia buona illuminazione \n- Tieni il telefono fermo")
+                    st.info("💡 Suggerimenti: \n- Inquadra meglio il barcode \n- Assicurati che ci sia buona illuminazione \n- Tieni il telefono fermo \n- Prova ad avvicinare/allontanare il telefono")
                     
             except ImportError:
                 st.error("📦 Libreria pyzbar non installata. Usa: pip install pyzbar pillow")
             except Exception as e:
                 st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         st.markdown("---")
     
