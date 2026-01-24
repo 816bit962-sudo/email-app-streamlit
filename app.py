@@ -100,32 +100,31 @@ with tab_ordine:
 
         if barcode_img is not None:
             try:
+                import cv2
+                import numpy as np
                 from pyzbar.pyzbar import decode
-                from PIL import Image, ImageEnhance, ImageOps
+                from PIL import Image
                 import io
 
-                # Leggi l'immagine
-                image = Image.open(io.BytesIO(barcode_img.getvalue()))
-                
-                # Converti in grayscale e aumenta contrasto
-                image = ImageOps.grayscale(image)
-                image = ImageEnhance.Contrast(image).enhance(2.0)
-                
-                # Ridimensiona se troppo grande
-                max_size = 1000
-                if image.width > max_size:
-                    ratio = max_size / image.width
-                    new_size = (max_size, int(image.height * ratio))
-                    image = image.resize(new_size)
+                # Leggi immagine da Streamlit e converti in OpenCV
+                pil_image = Image.open(io.BytesIO(barcode_img.getvalue()))
+                cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+
+                # Converti in grayscale
+                gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+
+                # Applica filtro per aumentare contrasto
+                gray = cv2.equalizeHist(gray)
 
                 # Decodifica barcode
-                decoded_objects = decode(image)
+                decoded_objects = decode(gray)
 
                 if decoded_objects:
+                    found = False
                     for obj in decoded_objects:
                         barcode_data = obj.data.decode('utf-8').strip()
                         
-                        # Cerca articolo con questo codice barcode
+                        # Cerca articolo corrispondente
                         articolo_trovato = next(
                             (a for a in articoli if a.get("Codice", "").strip() == barcode_data),
                             None
@@ -136,17 +135,22 @@ with tab_ordine:
                             st.session_state["mostra_scanner"] = False
                             st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
                             st.rerun()
-                        else:
-                            st.warning(f"⚠️ Barcode rilevato: {barcode_data} – nessun articolo corrispondente")
+                            found = True
+                            break  # esci dopo il primo articolo trovato
+
+                    if not found:
+                        all_codes = ", ".join([obj.data.decode('utf-8').strip() for obj in decoded_objects])
+                        st.warning(f"⚠️ Barcode rilevati: {all_codes} – nessun articolo corrispondente")
                 else:
-                    st.warning("⚠️ Nessun barcode rilevato nell'immagine")
+                    st.warning("⚠️ Nessun barcode rilevato")
 
             except ImportError:
-                st.error("📦 Libreria pyzbar non installata. Usa: pip install pyzbar pillow")
+                st.error("📦 Libreria pyzbar o OpenCV non installata. Usa: pip install pyzbar opencv-python pillow")
             except Exception as e:
                 st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
 
         st.markdown("---")
+
 
     
     # Selezione manuale
