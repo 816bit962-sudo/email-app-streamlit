@@ -269,11 +269,14 @@ with tab_riepilogo:
 # TAB 3 — ORDINI STORICI
 # ======================================================
 with tab_storico:
-    if not ordini:
+    # Filtra solo gli ordini creati dall'utente corrente
+    ordini_utente = [o for o in ordini if o.get("DipendenteEmail", "").lower() == email.lower()]
+    
+    if not ordini_utente:
         st.info("🛈 Nessun ordine presente")
     else:
         # Ordina dal più recente al più vecchio basandosi su IdOrdine
-        ordini_sorted = sorted(ordini, key=lambda x: int(x["IdOrdine"]), reverse=True)
+        ordini_sorted = sorted(ordini_utente, key=lambda x: int(x["IdOrdine"]), reverse=True)
         
         clienti_ordini = sorted({o["Cliente"] for o in ordini_sorted})
         
