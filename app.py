@@ -297,13 +297,14 @@ with tab_storico:
                 ),
                 "Descrizione": st.column_config.TextColumn(
                     "Descrizione",
-                    width="large"
+                    width="medium"
                 ),
                 "Qtà": st.column_config.NumberColumn(
                     "Qtà",
                     width="small"
                 )
-            }
+            },
+            height=300
         )
         
         st.divider()
