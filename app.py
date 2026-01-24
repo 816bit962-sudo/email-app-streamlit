@@ -257,10 +257,15 @@ with tab_storico:
     if not ordini:
         st.info("🛈 Nessun ordine presente")
     else:
-        # dal più recente al più vecchio
-        ordini_reversed = list(reversed(ordini))
+        # Ordina gli ordini dal più recente al più vecchio
+        ordini_sorted = sorted(
+            ordini,
+            key=lambda o: datetime.strptime(o["Data"], "%Y-%m-%d"),
+            reverse=True
+        )
         
-        clienti_ordini = sorted({o["Cliente"] for o in ordini_reversed})
+        # Lista dei clienti presenti negli ordini, in ordine alfabetico
+        clienti_ordini = sorted({o["Cliente"] for o in ordini_sorted})
         
         st.markdown("<b>Cliente</b>", unsafe_allow_html=True)
         cliente = st.selectbox(
@@ -269,8 +274,9 @@ with tab_storico:
             label_visibility="collapsed"
         )
         
+        # Filtra ordini del cliente selezionato
         ordini_cliente = [
-            o for o in ordini_reversed 
+            o for o in ordini_sorted
             if o["Cliente"].strip().lower() == cliente.strip().lower()
         ]
         
