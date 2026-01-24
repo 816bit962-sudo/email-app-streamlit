@@ -137,10 +137,10 @@ with tab_riepilogo:
     else:
         df = pd.DataFrame(ordine)
         
-        edited_df = st.data_editor(
+        event = st.data_editor(
             df[["Descrizione", "Qtà"]],
             use_container_width=True,
-            hide_index=False,
+            hide_index=True,
             num_rows="dynamic",
             column_config={
                 "Descrizione": st.column_config.TextColumn(
@@ -152,19 +152,19 @@ with tab_riepilogo:
                     min_value=1,
                     step=1
                 )
-            }
+            },
+            key="editor_riepilogo"
         )
         
-        # Aggiorna articoli basandosi sulle righe rimanenti
+        # Aggiorna articoli basandosi sul data_editor
         nuovi_articoli = []
-        for i, row in edited_df.iterrows():
+        for i in range(len(event)):
             if i < len(ordine):
-                art = ordine[i]
                 nuovi_articoli.append({
-                    "IdArticolo": art["IdArticolo"],
-                    "Codice": art["Codice"],
-                    "Descrizione": row["Descrizione"],
-                    "Qtà": int(row["Qtà"])
+                    "IdArticolo": ordine[i]["IdArticolo"],
+                    "Codice": ordine[i]["Codice"],
+                    "Descrizione": event.iloc[i]["Descrizione"],
+                    "Qtà": int(event.iloc[i]["Qtà"])
                 })
         
         st.session_state["ordine_articoli"] = nuovi_articoli
