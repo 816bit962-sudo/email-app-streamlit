@@ -76,7 +76,7 @@ tab_ordine, tab_riepilogo, tab_storico = st.tabs(
 # TAB 1 — INSERIMENTO ORDINE
 # ======================================================
 with tab_ordine:
-    # Bottone per aprire/chiudere scanner (opzionale, mantiene lo stato)
+    # Bottone per aprire/chiudere inserimento articolo
     if "mostra_scanner" not in st.session_state:
         st.session_state["mostra_scanner"] = False
     
@@ -84,7 +84,7 @@ with tab_ordine:
         st.session_state["mostra_scanner"] = not st.session_state["mostra_scanner"]
     
     st.button(
-        "📷 Inserimento Articolo" if not st.session_state["mostra_scanner"] else "❌ Chiudi Inserimento",
+        "📦 Inserimento Articolo" if not st.session_state["mostra_scanner"] else "❌ Chiudi Inserimento",
         use_container_width=True,
         on_click=toggle_scanner,
         type="secondary"
@@ -93,30 +93,37 @@ with tab_ordine:
     # Sezione scanner (visibile solo se attivata)
     if st.session_state["mostra_scanner"]:
         st.markdown("---")
-        
-        st.markdown("<b>Inserisci o scansiona codice articolo</b>", unsafe_allow_html=True)
-        codice_barcode = st.text_input(
-            "Codice articolo",
-            placeholder="Scansiona il codice con lo scanner Bluetooth",
-            key="barcode_input"
-        )
+        st.markdown("<b>Scansiona o inserisci codice articolo</b>", unsafe_allow_html=True)
 
-        if codice_barcode:
-            codice_barcode = str(codice_barcode).strip()
-            
+        # Funzione per processare il codice dallo scanner
+        def process_scanner():
+            codice = str(st.session_state["barcode_input"]).strip()
+            if not codice:
+                return
+
             articolo_trovato = next(
-                (a for a in articoli if str(a.get("Codice")).strip() == codice_barcode),
+                (a for a in articoli if str(a.get("Codice")).strip() == codice),
                 None
             )
-            
+
             if articolo_trovato:
                 st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
                 st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                st.session_state["barcode_input"] = ""
-                st.rerun()
             else:
-                st.error(f"❌ Nessun articolo trovato per il codice: {codice_barcode}")
+                st.error(f"❌ Nessun articolo trovato per il codice: {codice}")
 
+            # Reset automatico del campo input
+            st.session_state["barcode_input"] = ""
+
+        # Campo testo per scanner con callback
+        st.text_input(
+            "Codice articolo",
+            placeholder="Scansiona il codice con lo scanner Bluetooth",
+            key="barcode_input",
+            on_change=process_scanner
+        )
+
+        st.markdown("---")
     
     # Selezione manuale
     st.markdown("<b>Seleziona articolo</b>", unsafe_allow_html=True)
@@ -141,6 +148,7 @@ with tab_ordine:
             label_visibility="collapsed"
         )
     
+    # Funzione per aggiungere articolo alla lista
     def aggiungi_articolo():
         art = next(
             a for a in articoli 
@@ -171,6 +179,7 @@ with tab_ordine:
         key="cliente_scelto",
         label_visibility="collapsed"
     )
+
 
 
 # ======================================================
