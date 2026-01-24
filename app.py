@@ -93,117 +93,101 @@ with tab_ordine:
     # Sezione scanner (visibile solo se attivata)
     if st.session_state["mostra_scanner"]:
         st.markdown("---")
-        barcode_img = st.camera_input(
-            "Inquadra il codice a barre",
-            key="barcode_camera"
-        )
         
-        # Processamento barcode
-        if barcode_img is not None:
-            try:
-                from pyzbar import pyzbar
-                from PIL import Image, ImageEnhance, ImageOps
-                import io
-                import numpy as np
+        # Scanner HTML5 con QuaggaJS
+        scanner_html = """
+        <div id="scanner-container" style="width: 100%; max-width: 640px; margin: 0 auto;">
+            <div id="interactive" class="viewport" style="width: 100%; height: 400px; border: 2px solid #4CAF50; border-radius: 8px; overflow: hidden;"></div>
+            <div id="result" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; text-align: center; font-size: 18px; font-weight: bold;">
+                <span id="barcode-result">Inquadra un barcode...</span>
+            </div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+        <script>
+            if (typeof Quagga !== 'undefined') {
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: document.querySelector('#interactive'),
+                        constraints: {
+                            width: 640,
+                            height: 480,
+                            facingMode: "environment"
+                        },
+                    },
+                    decoder: {
+                        readers: [
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_128_reader",
+                            "code_39_reader",
+                            "codabar_reader",
+                            "upc_reader",
+                            "upc_e_reader"
+                        ]
+                    },
+                    locate: true
+                }, function(err) {
+                    if (err) {
+                        console.log(err);
+                        document.getElementById('barcode-result').innerHTML = "❌ Errore fotocamera: " + err;
+                        return;
+                    }
+                    Quagga.start();
+                });
+
+                let lastCode = null;
+                let lastTime = 0;
                 
-                st.info("🔍 Analisi barcode in corso...")
-                
-                # Leggi l'immagine
-                image = Image.open(io.BytesIO(barcode_img.getvalue()))
-                
-                # Mostra immagine originale
-                st.image(image, caption="Foto originale", width=200)
-                
-                # Lista per raccogliere tutti i risultati
-                all_results = []
-                
-                # Tentativo 1: Immagine originale
-                decoded = pyzbar.decode(image)
-                all_results.extend(decoded)
-                
-                # Tentativo 2: Converti in scala di grigi
-                gray_image = image.convert('L')
-                decoded = pyzbar.decode(gray_image)
-                all_results.extend(decoded)
-                
-                # Tentativo 3: Aumenta contrasto
-                enhancer = ImageEnhance.Contrast(gray_image)
-                contrast_image = enhancer.enhance(2.0)
-                decoded = pyzbar.decode(contrast_image)
-                all_results.extend(decoded)
-                
-                # Tentativo 4: Aumenta nitidezza
-                enhancer = ImageEnhance.Sharpness(contrast_image)
-                sharp_image = enhancer.enhance(2.0)
-                decoded = pyzbar.decode(sharp_image)
-                all_results.extend(decoded)
-                
-                # Tentativo 5: Inverti colori
-                inverted = ImageOps.invert(gray_image)
-                decoded = pyzbar.decode(inverted)
-                all_results.extend(decoded)
-                
-                # Tentativo 6: Ridimensiona immagine (più grande)
-                width, height = image.size
-                resized = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
-                decoded = pyzbar.decode(resized)
-                all_results.extend(decoded)
-                
-                st.write(f"✅ Completati 6 tentativi di lettura")
-                
-                # Rimuovi duplicati
-                unique_results = []
-                seen_data = set()
-                for result in all_results:
-                    data = result.data.decode('utf-8')
-                    if data not in seen_data:
-                        unique_results.append(result)
-                        seen_data.add(data)
-                
-                if unique_results:
-                    st.success(f"📊 Trovati {len(unique_results)} barcode!")
+                Quagga.onDetected(function(result) {
+                    const code = result.codeResult.code;
+                    const now = Date.now();
                     
-                    for result in unique_results:
-                        barcode_data = result.data.decode('utf-8')
-                        barcode_type = result.type
-                        st.info(f"Tipo: {barcode_type} | Codice: **{barcode_data}**")
+                    // Evita duplicati ravvicinati
+                    if (code === lastCode && now - lastTime < 2000) {
+                        return;
+                    }
                     
-                    # Usa il primo barcode
-                    barcode_data = unique_results[0].data.decode('utf-8')
+                    lastCode = code;
+                    lastTime = now;
                     
-                    # Cerca articolo
-                    articolo_trovato = next(
-                        (a for a in articoli if str(a.get("Codice", "")).strip() == barcode_data.strip()),
-                        None
-                    )
+                    document.getElementById('barcode-result').innerHTML = "✅ Codice: " + code;
                     
-                    if articolo_trovato:
-                        st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                        st.session_state["mostra_scanner"] = False
-                        st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Codice letto ma non trovato nel database: **{barcode_data}**")
-                        st.write("📋 Primi codici nel database:")
-                        for a in articoli[:5]:
-                            st.write(f"• `{a.get('Codice', 'N/A')}` - {a['Descrizione'][:40]}")
-                else:
-                    st.warning("⚠️ Nessun barcode rilevato dopo 6 tentativi")
-                    st.info("""💡 **Consigli per una buona scansione:**
-                    - Il barcode deve essere **ben illuminato** (evita ombre)
-                    - Inquadra il barcode **al centro** della foto
-                    - Tieni il telefono **parallelo** al barcode
-                    - Il barcode deve essere **nitido** (non sfocato)
-                    - Prova a **ritagliare** solo il barcode se possibile
-                    """)
+                    // Invia il codice a Streamlit
+                    window.parent.postMessage({
+                        type: 'streamlit:setComponentValue',
+                        barcode: code
+                    }, '*');
                     
-            except ImportError as ie:
-                st.error(f"📦 Libreria mancante: {str(ie)}")
-                st.info("Assicurati che pyzbar sia installato correttamente nel requirements.txt e packages.txt")
-            except Exception as e:
-                st.error(f"❌ Errore: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+                    // Feedback visivo
+                    navigator.vibrate && navigator.vibrate(200);
+                });
+            }
+        </script>
+        """
+        
+        import streamlit.components.v1 as components
+        barcode_result = components.html(scanner_html, height=500)
+        
+        # Se viene rilevato un barcode
+        if barcode_result and 'barcode' in barcode_result:
+            barcode_data = barcode_result['barcode']
+            
+            # Cerca articolo
+            articolo_trovato = next(
+                (a for a in articoli if str(a.get("Codice", "")).strip() == str(barcode_data).strip()),
+                None
+            )
+            
+            if articolo_trovato:
+                st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                st.session_state["mostra_scanner"] = False
+                st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                st.rerun()
+            else:
+                st.error(f"❌ Codice {barcode_data} non trovato nel database")
         
         st.markdown("---")
     
