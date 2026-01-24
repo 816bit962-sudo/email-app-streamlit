@@ -102,24 +102,21 @@ with tab_ordine:
         )
 
         if codice_barcode:
-            codice_barcode = codice_barcode.strip()
+            codice_barcode = str(codice_barcode).strip()
             
-            # Cerca articolo corrispondente
             articolo_trovato = next(
-                (a for a in articoli if a.get("Codice", "").strip() == codice_barcode),
+                (a for a in articoli if str(a.get("Codice")).strip() == codice_barcode),
                 None
             )
             
             if articolo_trovato:
                 st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
                 st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                # Pulisce il campo per la prossima scansione
                 st.session_state["barcode_input"] = ""
                 st.rerun()
             else:
                 st.error(f"❌ Nessun articolo trovato per il codice: {codice_barcode}")
 
-        st.markdown("---")
     
     # Selezione manuale
     st.markdown("<b>Seleziona articolo</b>", unsafe_allow_html=True)
