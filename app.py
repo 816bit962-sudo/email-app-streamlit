@@ -207,6 +207,9 @@ with tab_riepilogo:
                     st.session_state["note"]
                 )
                 
+                # Invalida la cache degli ordini per ricaricare i dati aggiornati
+                load_ordini.clear()
+                
                 rows_html = "".join([
                     f"""
                     <tr>
