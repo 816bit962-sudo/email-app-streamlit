@@ -52,6 +52,8 @@ if "qty_temp" not in st.session_state:
     st.session_state["qty_temp"] = 1
 if "note" not in st.session_state:
     st.session_state["note"] = ""
+if "ordine_inviato" not in st.session_state:
+    st.session_state["ordine_inviato"] = False
 
 # ===============================
 # LOAD DATA GLOBALE
@@ -246,9 +248,10 @@ with tab_riepilogo:
                     html=True
                 )
                 
-                st.success(f"✅ Ordine #{id_ordine} inviato!")
                 st.session_state["ordine_articoli"] = []
                 st.session_state["note"] = ""
+                st.session_state["ordine_inviato"] = True
+                st.session_state["ultimo_id_ordine"] = id_ordine
         
         st.button(
             "📧 Invia ordine",
@@ -256,6 +259,11 @@ with tab_riepilogo:
             use_container_width=True,
             on_click=invio_completato
         )
+        
+        # Mostra messaggio di successo solo una volta
+        if st.session_state.get("ordine_inviato", False):
+            st.success(f"✅ Ordine #{st.session_state['ultimo_id_ordine']} inviato!")
+            st.session_state["ordine_inviato"] = False
 
 # ======================================================
 # TAB 3 — ORDINI STORICI
