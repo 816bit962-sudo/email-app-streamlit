@@ -93,10 +93,117 @@ with tab_ordine:
     # Sezione scanner (visibile solo se attivata)
     if st.session_state["mostra_scanner"]:
         st.markdown("---")
-        st.info("💡 Lo scanner live funziona meglio con barcode numerici. Per barcode alfanumerici usa l'input manuale sotto.")
         
-        # Input manuale del codice (principale per barcode alfanumerici)
-        st.markdown("**Inserisci il codice barcode:**")
+        # Scanner HTML5 con QuaggaJS (supporto migliorato per alfanumerici)
+        scanner_html = """
+        <div id="scanner-container" style="width: 100%; max-width: 640px; margin: 0 auto;">
+            <div id="interactive" class="viewport" style="width: 100%; height: 300px; border: 2px solid #4CAF50; border-radius: 8px; overflow: hidden; background: black;"></div>
+            <div id="result" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; text-align: center; font-size: 16px; font-weight: bold;">
+                <span id="barcode-result">📸 Inquadra il barcode...</span>
+            </div>
+            <button id="stop-btn" style="margin-top: 10px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; width: 100%; cursor: pointer;">
+                ⏹️ Ferma Scanner
+            </button>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+        <script>
+            let quaggaRunning = false;
+            
+            if (typeof Quagga !== 'undefined' && !quaggaRunning) {
+                quaggaRunning = true;
+                
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: document.querySelector('#interactive'),
+                        constraints: {
+                            width: 640,
+                            height: 480,
+                            facingMode: "environment"
+                        },
+                    },
+                    decoder: {
+                        readers: [
+                            "code_128_reader",  // Supporta alfanumerici
+                            "code_39_reader",   // Supporta alfanumerici
+                            "code_39_vin_reader",
+                            "codabar_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "upc_reader",
+                            "upc_e_reader",
+                            "i2of5_reader",
+                            "2of5_reader"
+                        ],
+                        multiple: false
+                    },
+                    locate: true,
+                    locator: {
+                        halfSample: true,
+                        patchSize: "medium"
+                    },
+                    numOfWorkers: 4,
+                    frequency: 10
+                }, function(err) {
+                    if (err) {
+                        console.log(err);
+                        document.getElementById('barcode-result').innerHTML = "❌ Errore fotocamera";
+                        return;
+                    }
+                    Quagga.start();
+                    console.log("Scanner started");
+                });
+
+                let detectionCount = {};
+                
+                Quagga.onDetected(function(result) {
+                    const code = result.codeResult.code;
+                    const format = result.codeResult.format;
+                    
+                    // Conta rilevamenti per validazione
+                    if (!detectionCount[code]) {
+                        detectionCount[code] = 0;
+                    }
+                    detectionCount[code]++;
+                    
+                    // Mostra il codice rilevato
+                    document.getElementById('barcode-result').innerHTML = 
+                        "🔍 " + format + ": <strong>" + code + "</strong> (" + detectionCount[code] + "x)";
+                    
+                    // Conferma dopo 2 rilevamenti dello stesso codice
+                    if (detectionCount[code] >= 2) {
+                        document.getElementById('barcode-result').innerHTML = 
+                            "✅ Codice confermato: <strong>" + code + "</strong>";
+                        
+                        // Feedback
+                        if (navigator.vibrate) {
+                            navigator.vibrate([100, 50, 100]);
+                        }
+                        
+                        // Reset counter
+                        detectionCount = {};
+                    }
+                });
+                
+                // Stop button
+                document.getElementById('stop-btn').addEventListener('click', function() {
+                    Quagga.stop();
+                    quaggaRunning = false;
+                    document.getElementById('barcode-result').innerHTML = "⏹️ Scanner fermato";
+                });
+            }
+        </script>
+        """
+        
+        import streamlit.components.v1 as components
+        components.html(scanner_html, height=450)
+        
+        st.markdown("---")
+        
+        # Input manuale del codice (alternativa)
+        st.markdown("**Oppure inserisci il codice manualmente:**")
         
         col_input, col_search = st.columns([3, 1])
         
