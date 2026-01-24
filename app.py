@@ -139,13 +139,13 @@ with tab_ordine:
         )
     
     with col2:
-        st.markdown("<b>Qtà</b>", unsafe_allow_html=True)
         st.number_input(
-            "Qtà",
+            "",
             min_value=1,
             step=1,
             key="qty_temp",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            format="%d"  # forza il numero intero senza decimal
         )
     
     # Funzione per aggiungere articolo alla lista
@@ -179,6 +179,7 @@ with tab_ordine:
         key="cliente_scelto",
         label_visibility="collapsed"
     )
+
 
 
 
