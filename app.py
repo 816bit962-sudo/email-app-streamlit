@@ -359,10 +359,15 @@ with tab_storico:
             </body></html>
             """
             
+            # Crea oggetto con note se presenti
+            oggetto = f"Ordine #{ordine_scelto['IdOrdine']}"
+            if ordine_scelto.get("Note", "").strip():
+                oggetto += f" - {ordine_scelto['Note']}"
+            
             send_email(
                 credentials,
                 destinatario,
-                f"Ordine #{ordine_scelto['IdOrdine']}",
+                oggetto,
                 corpo_html,
                 html=True
             )
