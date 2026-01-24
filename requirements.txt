@@ -1,4 +1,6 @@
 streamlit
+pyzbar
+pillow
 streamlit-aggrid
 google-auth
 google-auth-oauthlib

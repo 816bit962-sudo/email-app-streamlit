@@ -76,68 +76,79 @@ tab_ordine, tab_riepilogo, tab_storico = st.tabs(
 # TAB 1 — INSERIMENTO ORDINE
 # ======================================================
 with tab_ordine:
+    # Bottone per aprire/chiudere scanner barcode
+    if "mostra_scanner" not in st.session_state:
+        st.session_state["mostra_scanner"] = False
+    
+    def toggle_scanner():
+        st.session_state["mostra_scanner"] = not st.session_state["mostra_scanner"]
+    
+    st.button(
+        "📷 Scansiona Barcode" if not st.session_state["mostra_scanner"] else "❌ Chiudi Scanner",
+        use_container_width=True,
+        on_click=toggle_scanner,
+        type="secondary"
+    )
+    
+    # Sezione scanner (visibile solo se attivata)
+    if st.session_state["mostra_scanner"]:
+        st.markdown("---")
+        barcode_img = st.camera_input(
+            "Inquadra il codice a barre",
+            key="barcode_camera"
+        )
+        
+        # Processamento barcode
+        if barcode_img is not None:
+            try:
+                from pyzbar.pyzbar import decode
+                from PIL import Image
+                import io
+                
+                # Leggi l'immagine
+                image = Image.open(io.BytesIO(barcode_img.getvalue()))
+                
+                # Decodifica barcode
+                decoded_objects = decode(image)
+                
+                if decoded_objects:
+                    barcode_data = decoded_objects[0].data.decode('utf-8')
+                    
+                    # Cerca articolo con questo codice barcode
+                    articolo_trovato = next(
+                        (a for a in articoli if a.get("Codice", "").strip() == barcode_data.strip()),
+                        None
+                    )
+                    
+                    if articolo_trovato:
+                        st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                        st.session_state["mostra_scanner"] = False
+                        st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Nessun articolo trovato per il codice: {barcode_data}")
+                else:
+                    st.warning("⚠️ Nessun barcode rilevato nell'immagine")
+                    
+            except ImportError:
+                st.error("📦 Libreria pyzbar non installata. Usa: pip install pyzbar pillow")
+            except Exception as e:
+                st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
+        
+        st.markdown("---")
+    
+    # Selezione manuale
     st.markdown("<b>Seleziona articolo</b>", unsafe_allow_html=True)
     
-    col_select, col_camera = st.columns([5, 1], gap="small")
+    col1, col2 = st.columns([4, 1], gap="small")
     
-    with col_select:
+    with col1:
         st.selectbox(
             "Articolo",
             options=[a["Descrizione"] for a in articoli],
             key="articolo_temp",
             label_visibility="collapsed"
         )
-    
-    with col_camera:
-        st.markdown("<br>", unsafe_allow_html=True)
-        barcode_img = st.camera_input(
-            "📷",
-            label_visibility="collapsed",
-            key="barcode_camera"
-        )
-    
-    # Processamento barcode
-    if barcode_img is not None:
-        try:
-            from pyzbar.pyzbar import decode
-            from PIL import Image
-            import io
-            
-            # Leggi l'immagine
-            image = Image.open(io.BytesIO(barcode_img.getvalue()))
-            
-            # Decodifica barcode
-            decoded_objects = decode(image)
-            
-            if decoded_objects:
-                barcode_data = decoded_objects[0].data.decode('utf-8')
-                
-                # Cerca articolo con questo codice barcode
-                articolo_trovato = next(
-                    (a for a in articoli if a.get("Codice", "").strip() == barcode_data.strip()),
-                    None
-                )
-                
-                if articolo_trovato:
-                    st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                    st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                    # Resetta la fotocamera
-                    st.session_state["barcode_camera"] = None
-                    st.rerun()
-                else:
-                    st.error(f"❌ Nessun articolo trovato per il codice: {barcode_data}")
-            else:
-                st.warning("⚠️ Nessun barcode rilevato nell'immagine")
-                
-        except ImportError:
-            st.error("📦 Libreria pyzbar non installata. Usa: pip install pyzbar pillow")
-        except Exception as e:
-            st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
-    
-    col1, col2 = st.columns([4, 1], gap="small")
-    
-    with col1:
-        st.markdown("<b>oppure inserisci manualmente</b>", unsafe_allow_html=True)
     
     with col2:
         st.markdown("<b>Qtà</b>", unsafe_allow_html=True)
