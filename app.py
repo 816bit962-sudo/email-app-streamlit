@@ -108,11 +108,15 @@ with tab_ordine:
                 # Leggi l'immagine
                 image = Image.open(io.BytesIO(barcode_img.getvalue()))
                 
-                # Decodifica barcode
+                # Converti in scala di grigi per migliore rilevamento
+                image = image.convert('L')
+                
+                # Decodifica barcode con più tentativi
                 decoded_objects = decode(image)
                 
                 if decoded_objects:
                     barcode_data = decoded_objects[0].data.decode('utf-8')
+                    st.info(f"🔍 Codice rilevato: {barcode_data}")
                     
                     # Cerca articolo con questo codice barcode
                     articolo_trovato = next(
@@ -127,8 +131,10 @@ with tab_ordine:
                         st.rerun()
                     else:
                         st.error(f"❌ Nessun articolo trovato per il codice: {barcode_data}")
+                        st.info("💡 Verifica che il codice corrisponda a quello nel foglio Articoli")
                 else:
                     st.warning("⚠️ Nessun barcode rilevato nell'immagine")
+                    st.info("💡 Suggerimenti: \n- Inquadra meglio il barcode \n- Assicurati che ci sia buona illuminazione \n- Tieni il telefono fermo")
                     
             except ImportError:
                 st.error("📦 Libreria pyzbar non installata. Usa: pip install pyzbar pillow")
