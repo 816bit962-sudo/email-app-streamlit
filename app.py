@@ -145,12 +145,14 @@ with tab_riepilogo:
             column_config={
                 "Descrizione": st.column_config.TextColumn(
                     "Descrizione",
-                    disabled=True
+                    disabled=True,
+                    width="large"
                 ),
                 "Qtà": st.column_config.NumberColumn(
                     "Qtà",
                     min_value=1,
-                    step=1
+                    step=1,
+                    width="small"
                 )
             },
             key="editor_riepilogo"
@@ -284,7 +286,25 @@ with tab_storico:
         st.divider()
         
         df_art = pd.DataFrame(ordine_scelto["Articoli"])
-        st.dataframe(df_art, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_art,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Codice": st.column_config.TextColumn(
+                    "Codice",
+                    width="small"
+                ),
+                "Descrizione": st.column_config.TextColumn(
+                    "Descrizione",
+                    width="large"
+                ),
+                "Qtà": st.column_config.NumberColumn(
+                    "Qtà",
+                    width="small"
+                )
+            }
+        )
         
         st.divider()
         
