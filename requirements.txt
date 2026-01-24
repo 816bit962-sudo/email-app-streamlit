@@ -1,6 +1,7 @@
 streamlit
 pyzbar
 pillow
+numpy
 streamlit-aggrid
 google-auth
 google-auth-oauthlib

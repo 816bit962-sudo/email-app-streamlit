@@ -101,56 +101,109 @@ with tab_ordine:
         # Processamento barcode
         if barcode_img is not None:
             try:
-                import base64
-                import requests
-                
-                # Converti immagine in base64
-                img_bytes = barcode_img.getvalue()
-                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                from pyzbar import pyzbar
+                from PIL import Image, ImageEnhance, ImageOps
+                import io
+                import numpy as np
                 
                 st.info("🔍 Analisi barcode in corso...")
                 
-                # Usa API gratuita per decodificare barcode
-                response = requests.post(
-                    'https://api.qrserver.com/v1/read-qr-code/',
-                    files={'file': img_bytes}
-                )
+                # Leggi l'immagine
+                image = Image.open(io.BytesIO(barcode_img.getvalue()))
                 
-                if response.status_code == 200:
-                    result = response.json()
+                # Mostra immagine originale
+                st.image(image, caption="Foto originale", width=200)
+                
+                # Lista per raccogliere tutti i risultati
+                all_results = []
+                
+                # Tentativo 1: Immagine originale
+                decoded = pyzbar.decode(image)
+                all_results.extend(decoded)
+                
+                # Tentativo 2: Converti in scala di grigi
+                gray_image = image.convert('L')
+                decoded = pyzbar.decode(gray_image)
+                all_results.extend(decoded)
+                
+                # Tentativo 3: Aumenta contrasto
+                enhancer = ImageEnhance.Contrast(gray_image)
+                contrast_image = enhancer.enhance(2.0)
+                decoded = pyzbar.decode(contrast_image)
+                all_results.extend(decoded)
+                
+                # Tentativo 4: Aumenta nitidezza
+                enhancer = ImageEnhance.Sharpness(contrast_image)
+                sharp_image = enhancer.enhance(2.0)
+                decoded = pyzbar.decode(sharp_image)
+                all_results.extend(decoded)
+                
+                # Tentativo 5: Inverti colori
+                inverted = ImageOps.invert(gray_image)
+                decoded = pyzbar.decode(inverted)
+                all_results.extend(decoded)
+                
+                # Tentativo 6: Ridimensiona immagine (più grande)
+                width, height = image.size
+                resized = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
+                decoded = pyzbar.decode(resized)
+                all_results.extend(decoded)
+                
+                st.write(f"✅ Completati 6 tentativi di lettura")
+                
+                # Rimuovi duplicati
+                unique_results = []
+                seen_data = set()
+                for result in all_results:
+                    data = result.data.decode('utf-8')
+                    if data not in seen_data:
+                        unique_results.append(result)
+                        seen_data.add(data)
+                
+                if unique_results:
+                    st.success(f"📊 Trovati {len(unique_results)} barcode!")
                     
-                    if result and len(result) > 0 and result[0]['symbol'][0]['data']:
-                        barcode_data = result[0]['symbol'][0]['data']
-                        st.info(f"📊 Codice rilevato: {barcode_data}")
-                        
-                        # Cerca articolo con questo codice barcode
-                        articolo_trovato = next(
-                            (a for a in articoli if a.get("Codice", "").strip() == barcode_data.strip()),
-                            None
-                        )
-                        
-                        if articolo_trovato:
-                            st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                            st.session_state["mostra_scanner"] = False
-                            st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ Nessun articolo trovato per il codice: {barcode_data}")
-                            st.info("💡 Il codice è stato letto ma non corrisponde a nessun articolo nel database")
-                            # Mostra alcuni codici del database
-                            st.write("📋 Primi codici nel database:")
-                            codici = [f"{a.get('Codice', 'N/A')} - {a['Descrizione'][:30]}" for a in articoli[:5]]
-                            for c in codici:
-                                st.write(f"• {c}")
+                    for result in unique_results:
+                        barcode_data = result.data.decode('utf-8')
+                        barcode_type = result.type
+                        st.info(f"Tipo: {barcode_type} | Codice: **{barcode_data}**")
+                    
+                    # Usa il primo barcode
+                    barcode_data = unique_results[0].data.decode('utf-8')
+                    
+                    # Cerca articolo
+                    articolo_trovato = next(
+                        (a for a in articoli if str(a.get("Codice", "")).strip() == barcode_data.strip()),
+                        None
+                    )
+                    
+                    if articolo_trovato:
+                        st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                        st.session_state["mostra_scanner"] = False
+                        st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                        st.rerun()
                     else:
-                        st.warning("⚠️ Nessun barcode rilevato nell'immagine")
-                        st.info("💡 Suggerimenti:\n- Inquadra meglio il barcode\n- Assicurati che ci sia buona illuminazione\n- Tieni il telefono fermo\n- Prova ad avvicinare/allontanare il telefono")
+                        st.error(f"❌ Codice letto ma non trovato nel database: **{barcode_data}**")
+                        st.write("📋 Primi codici nel database:")
+                        for a in articoli[:5]:
+                            st.write(f"• `{a.get('Codice', 'N/A')}` - {a['Descrizione'][:40]}")
                 else:
-                    st.error(f"❌ Errore nel servizio di lettura: {response.status_code}")
+                    st.warning("⚠️ Nessun barcode rilevato dopo 6 tentativi")
+                    st.info("""💡 **Consigli per una buona scansione:**
+                    - Il barcode deve essere **ben illuminato** (evita ombre)
+                    - Inquadra il barcode **al centro** della foto
+                    - Tieni il telefono **parallelo** al barcode
+                    - Il barcode deve essere **nitido** (non sfocato)
+                    - Prova a **ritagliare** solo il barcode se possibile
+                    """)
                     
+            except ImportError as ie:
+                st.error(f"📦 Libreria mancante: {str(ie)}")
+                st.info("Assicurati che pyzbar sia installato correttamente nel requirements.txt e packages.txt")
             except Exception as e:
-                st.error(f"❌ Errore nella lettura del barcode: {str(e)}")
-                st.info("💡 Verifica la connessione internet")
+                st.error(f"❌ Errore: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         st.markdown("---")
     
