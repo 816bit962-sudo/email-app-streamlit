@@ -231,10 +231,14 @@ with tab_riepilogo:
                 </body></html>
                 """
                 
+                oggetto = f"Ordine #{id_ordine}"
+                if st.session_state["note"].strip():
+                    oggetto += f" - {st.session_state['note']}"
+                
                 send_email(
                     credentials,
                     st.session_state["destinatario_scelto"],
-                    f"Ordine #{id_ordine}",
+                    oggetto,
                     corpo_html,
                     html=True
                 )
