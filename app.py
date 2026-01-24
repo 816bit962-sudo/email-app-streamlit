@@ -79,9 +79,12 @@ with tab_ordine:
     # Bottone per aprire/chiudere scanner barcode
     if "mostra_scanner" not in st.session_state:
         st.session_state["mostra_scanner"] = False
+    if "barcode_scansionato" not in st.session_state:
+        st.session_state["barcode_scansionato"] = None
     
     def toggle_scanner():
         st.session_state["mostra_scanner"] = not st.session_state["mostra_scanner"]
+        st.session_state["barcode_scansionato"] = None
     
     st.button(
         "📷 Scansiona Barcode" if not st.session_state["mostra_scanner"] else "❌ Chiudi Scanner",
@@ -105,7 +108,9 @@ with tab_ordine:
         
         <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
         <script>
-            if (typeof Quagga !== 'undefined') {
+            if (typeof Quagga !== 'undefined' && !window.quaggaStarted) {
+                window.quaggaStarted = true;
+                
                 Quagga.init({
                     inputStream: {
                         name: "Live",
@@ -132,7 +137,7 @@ with tab_ordine:
                 }, function(err) {
                     if (err) {
                         console.log(err);
-                        document.getElementById('barcode-result').innerHTML = "❌ Errore fotocamera: " + err;
+                        document.getElementById('barcode-result').innerHTML = "❌ Errore fotocamera";
                         return;
                     }
                     Quagga.start();
@@ -155,39 +160,61 @@ with tab_ordine:
                     
                     document.getElementById('barcode-result').innerHTML = "✅ Codice: " + code;
                     
-                    // Invia il codice a Streamlit
-                    window.parent.postMessage({
-                        type: 'streamlit:setComponentValue',
-                        barcode: code
-                    }, '*');
-                    
                     // Feedback visivo
-                    navigator.vibrate && navigator.vibrate(200);
+                    if (navigator.vibrate) {
+                        navigator.vibrate(200);
+                    }
+                    
+                    // Crea un input nascosto con il codice
+                    let input = document.getElementById('barcode-input');
+                    if (!input) {
+                        input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.id = 'barcode-input';
+                        input.name = 'barcode-input';
+                        document.body.appendChild(input);
+                    }
+                    input.value = code;
+                    
+                    // Trigger change event
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 });
             }
+            
+            // Cleanup on unmount
+            window.addEventListener('beforeunload', function() {
+                if (typeof Quagga !== 'undefined') {
+                    Quagga.stop();
+                }
+            });
         </script>
         """
         
         import streamlit.components.v1 as components
-        barcode_result = components.html(scanner_html, height=500)
+        components.html(scanner_html, height=500)
         
-        # Se viene rilevato un barcode
-        if barcode_result and 'barcode' in barcode_result:
-            barcode_data = barcode_result['barcode']
-            
-            # Cerca articolo
-            articolo_trovato = next(
-                (a for a in articoli if str(a.get("Codice", "")).strip() == str(barcode_data).strip()),
-                None
-            )
-            
-            if articolo_trovato:
-                st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                st.session_state["mostra_scanner"] = False
-                st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                st.rerun()
-            else:
-                st.error(f"❌ Codice {barcode_data} non trovato nel database")
+        # Input manuale del codice se lo scanner non funziona
+        st.markdown("**Oppure inserisci il codice manualmente:**")
+        codice_manuale = st.text_input("Codice barcode", key="codice_manuale_input", label_visibility="collapsed")
+        
+        if st.button("🔍 Cerca codice", use_container_width=True):
+            if codice_manuale:
+                # Cerca articolo
+                articolo_trovato = next(
+                    (a for a in articoli if str(a.get("Codice", "")).strip() == str(codice_manuale).strip()),
+                    None
+                )
+                
+                if articolo_trovato:
+                    st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                    st.session_state["mostra_scanner"] = False
+                    st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Codice {codice_manuale} non trovato nel database")
+                    st.write("📋 Primi codici nel database:")
+                    for a in articoli[:5]:
+                        st.write(f"• `{a.get('Codice', 'N/A')}` - {a['Descrizione'][:40]}")
         
         st.markdown("---")
     
