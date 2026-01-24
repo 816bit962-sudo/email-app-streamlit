@@ -79,12 +79,9 @@ with tab_ordine:
     # Bottone per aprire/chiudere scanner barcode
     if "mostra_scanner" not in st.session_state:
         st.session_state["mostra_scanner"] = False
-    if "barcode_scansionato" not in st.session_state:
-        st.session_state["barcode_scansionato"] = None
     
     def toggle_scanner():
         st.session_state["mostra_scanner"] = not st.session_state["mostra_scanner"]
-        st.session_state["barcode_scansionato"] = None
     
     st.button(
         "📷 Scansiona Barcode" if not st.session_state["mostra_scanner"] else "❌ Chiudi Scanner",
@@ -96,20 +93,64 @@ with tab_ordine:
     # Sezione scanner (visibile solo se attivata)
     if st.session_state["mostra_scanner"]:
         st.markdown("---")
+        st.info("💡 Lo scanner live funziona meglio con barcode numerici. Per barcode alfanumerici usa l'input manuale sotto.")
         
-        # Scanner HTML5 con QuaggaJS
+        # Input manuale del codice (principale per barcode alfanumerici)
+        st.markdown("**Inserisci il codice barcode:**")
+        
+        col_input, col_search = st.columns([3, 1])
+        
+        with col_input:
+            codice_manuale = st.text_input(
+                "Codice barcode", 
+                key="codice_manuale_input", 
+                label_visibility="collapsed",
+                placeholder="Inserisci codice..."
+            )
+        
+        with col_search:
+            st.markdown("<br>", unsafe_allow_html=True)
+            cerca_btn = st.button("🔍", use_container_width=True)
+        
+        if cerca_btn and codice_manuale:
+            # Cerca articolo
+            articolo_trovato = next(
+                (a for a in articoli if str(a.get("Codice", "")).strip().upper() == str(codice_manuale).strip().upper()),
+                None
+            )
+            
+            if articolo_trovato:
+                st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
+                st.session_state["mostra_scanner"] = False
+                st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
+                st.rerun()
+            else:
+                st.error(f"❌ Codice `{codice_manuale}` non trovato nel database")
+                st.write("📋 Primi codici nel database:")
+                for a in articoli[:8]:
+                    st.write(f"• `{a.get('Codice', 'N/A')}` → {a['Descrizione'][:40]}")
+        
+        st.markdown("---")
+        st.markdown("**Oppure usa lo scanner automatico:**")
+        
+        # Scanner HTML5 con QuaggaJS (supporto migliorato per alfanumerici)
         scanner_html = """
         <div id="scanner-container" style="width: 100%; max-width: 640px; margin: 0 auto;">
-            <div id="interactive" class="viewport" style="width: 100%; height: 400px; border: 2px solid #4CAF50; border-radius: 8px; overflow: hidden;"></div>
-            <div id="result" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; text-align: center; font-size: 18px; font-weight: bold;">
-                <span id="barcode-result">Inquadra un barcode...</span>
+            <div id="interactive" class="viewport" style="width: 100%; height: 300px; border: 2px solid #4CAF50; border-radius: 8px; overflow: hidden; background: black;"></div>
+            <div id="result" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; text-align: center; font-size: 16px; font-weight: bold;">
+                <span id="barcode-result">📸 Inquadra il barcode...</span>
             </div>
+            <button id="stop-btn" style="margin-top: 10px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; width: 100%; cursor: pointer;">
+                ⏹️ Ferma Scanner
+            </button>
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
         <script>
-            if (typeof Quagga !== 'undefined' && !window.quaggaStarted) {
-                window.quaggaStarted = true;
+            let quaggaRunning = false;
+            
+            if (typeof Quagga !== 'undefined' && !quaggaRunning) {
+                quaggaRunning = true;
                 
                 Quagga.init({
                     inputStream: {
@@ -124,16 +165,26 @@ with tab_ordine:
                     },
                     decoder: {
                         readers: [
+                            "code_128_reader",  // Supporta alfanumerici
+                            "code_39_reader",   // Supporta alfanumerici
+                            "code_39_vin_reader",
+                            "codabar_reader",
                             "ean_reader",
                             "ean_8_reader",
-                            "code_128_reader",
-                            "code_39_reader",
-                            "codabar_reader",
                             "upc_reader",
-                            "upc_e_reader"
-                        ]
+                            "upc_e_reader",
+                            "i2of5_reader",
+                            "2of5_reader"
+                        ],
+                        multiple: false
                     },
-                    locate: true
+                    locate: true,
+                    locator: {
+                        halfSample: true,
+                        patchSize: "medium"
+                    },
+                    numOfWorkers: 4,
+                    frequency: 10
                 }, function(err) {
                     if (err) {
                         console.log(err);
@@ -141,80 +192,52 @@ with tab_ordine:
                         return;
                     }
                     Quagga.start();
+                    console.log("Scanner started");
                 });
 
-                let lastCode = null;
-                let lastTime = 0;
+                let detectionCount = {};
                 
                 Quagga.onDetected(function(result) {
                     const code = result.codeResult.code;
-                    const now = Date.now();
+                    const format = result.codeResult.format;
                     
-                    // Evita duplicati ravvicinati
-                    if (code === lastCode && now - lastTime < 2000) {
-                        return;
+                    // Conta rilevamenti per validazione
+                    if (!detectionCount[code]) {
+                        detectionCount[code] = 0;
                     }
+                    detectionCount[code]++;
                     
-                    lastCode = code;
-                    lastTime = now;
+                    // Mostra il codice rilevato
+                    document.getElementById('barcode-result').innerHTML = 
+                        "🔍 " + format + ": <strong>" + code + "</strong> (" + detectionCount[code] + "x)";
                     
-                    document.getElementById('barcode-result').innerHTML = "✅ Codice: " + code;
-                    
-                    // Feedback visivo
-                    if (navigator.vibrate) {
-                        navigator.vibrate(200);
+                    // Conferma dopo 2 rilevamenti dello stesso codice
+                    if (detectionCount[code] >= 2) {
+                        document.getElementById('barcode-result').innerHTML = 
+                            "✅ Codice confermato: <strong>" + code + "</strong>";
+                        
+                        // Feedback
+                        if (navigator.vibrate) {
+                            navigator.vibrate([100, 50, 100]);
+                        }
+                        
+                        // Reset counter
+                        detectionCount = {};
                     }
-                    
-                    // Crea un input nascosto con il codice
-                    let input = document.getElementById('barcode-input');
-                    if (!input) {
-                        input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.id = 'barcode-input';
-                        input.name = 'barcode-input';
-                        document.body.appendChild(input);
-                    }
-                    input.value = code;
-                    
-                    // Trigger change event
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                
+                // Stop button
+                document.getElementById('stop-btn').addEventListener('click', function() {
+                    Quagga.stop();
+                    quaggaRunning = false;
+                    document.getElementById('barcode-result').innerHTML = "⏹️ Scanner fermato";
                 });
             }
-            
-            // Cleanup on unmount
-            window.addEventListener('beforeunload', function() {
-                if (typeof Quagga !== 'undefined') {
-                    Quagga.stop();
-                }
-            });
         </script>
         """
         
         import streamlit.components.v1 as components
-        components.html(scanner_html, height=500)
-        
-        # Input manuale del codice se lo scanner non funziona
-        st.markdown("**Oppure inserisci il codice manualmente:**")
-        codice_manuale = st.text_input("Codice barcode", key="codice_manuale_input", label_visibility="collapsed")
-        
-        if st.button("🔍 Cerca codice", use_container_width=True):
-            if codice_manuale:
-                # Cerca articolo
-                articolo_trovato = next(
-                    (a for a in articoli if str(a.get("Codice", "")).strip() == str(codice_manuale).strip()),
-                    None
-                )
-                
-                if articolo_trovato:
-                    st.session_state["articolo_temp"] = articolo_trovato["Descrizione"]
-                    st.session_state["mostra_scanner"] = False
-                    st.success(f"✅ Articolo trovato: {articolo_trovato['Descrizione']}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Codice {codice_manuale} non trovato nel database")
-                    st.write("📋 Primi codici nel database:")
-                    for a in articoli[:5]:
-                        st.write(f"• `{a.get('Codice', 'N/A')}` - {a['Descrizione'][:40]}")
+        components.html(scanner_html, height=450)
         
         st.markdown("---")
     
